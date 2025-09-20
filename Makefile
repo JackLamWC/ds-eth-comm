@@ -114,6 +114,7 @@ include $(CHIBIOS)/os/hal/lib/streams/streams.mk
 include $(CHIBIOS)/tools/mk/autobuild.mk
 
 
+
 # Define linker script file here
 LDSCRIPT= $(STARTUPLD)/STM32H750xB.ld
 

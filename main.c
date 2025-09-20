@@ -23,54 +23,9 @@
 #include "chprintf.h"
 #include "SEGGER_RTT_Channel.h"
 
-#define UDP_SERVER_PORT 1234
-#define UDP_BUFFER_SIZE 1024
-
-// Network configuration - DHCP is now enabled
-// The device will automatically get IP address from your router
-// These values are only used for MAC address and hostname
-
-// MAC Address configuration
-// Option 1: Use default MAC address (C2:AF:51:03:CF:46) by setting .macaddress = NULL
-// Option 2: Use custom MAC address by uncommenting and modifying the values below
-// #define DEVICE_MAC_0       0xC2  // Default: 0xC2
-// #define DEVICE_MAC_1       0xAF  // Default: 0xAF  
-// #define DEVICE_MAC_2       0x51  // Default: 0x51
-// #define DEVICE_MAC_3       0x03  // Default: 0x03
-// #define DEVICE_MAC_4       0xCF  // Default: 0xCF
-// #define DEVICE_MAC_5       0x46  // Default: 0x46
-
-// Network mode selection
-#define USE_DHCP            1    // Set to 1 for DHCP, 0 for static IP
-
-// Fallback definitions in case constants are not available
-#ifndef NET_ADDRESS_DHCP
-#define NET_ADDRESS_DHCP    1
-#endif
-#ifndef NET_ADDRESS_STATIC
-#define NET_ADDRESS_STATIC  2
-#endif
-
-// Static IP configuration (not used when DHCP is enabled)
-// Uncomment and change .addrMode to NET_ADDRESS_STATIC to use static IP
-#define DEVICE_IP_A        192
-#define DEVICE_IP_B        168
-#define DEVICE_IP_C        0
-#define DEVICE_IP_D        100
-
-#define GATEWAY_A          192
-#define GATEWAY_B          168
-#define GATEWAY_C          0
-#define GATEWAY_D          1
-
-#define NETMASK_A          255
-#define NETMASK_B          255
-#define NETMASK_C          255
-#define NETMASK_D          0
-
-
-
-
+#define LWIP_PORT_INIT_IPADDR(addr)   IP4_ADDR((addr), 192,168,1,200)
+#define LWIP_PORT_INIT_GW(addr)       IP4_ADDR((addr), 192,168,1,1)
+#define LWIP_PORT_INIT_NETMASK(addr)  IP4_ADDR((addr), 255,255,255,0)
 
 
 /*
@@ -79,99 +34,95 @@
  */
 static THD_WORKING_AREA(waThread1, 128);
 static THD_FUNCTION(Thread1, arg) {
-
   (void)arg;
   chRegSetThreadName("blinker");
   while (true) {
-    palClearLine(LINE_LED_GREEN);
-    chThdSleepMilliseconds(50);
-    palClearLine(LINE_LED_RED);
-    chThdSleepMilliseconds(200);
-    palSetLine(LINE_LED_GREEN);
-    chThdSleepMilliseconds(50);
-    palSetLine(LINE_LED_RED);
-    chThdSleepMilliseconds(200);
+    palClearLine(LINE_LED_RED_E12);
+    chThdSleepMilliseconds(1000);
+    palSetLine(LINE_LED_RED_E12);
+    chThdSleepMilliseconds(1000);
   }
 }
 
+
+// UDP Server Configuration
+#define UDP_SERVER_PORT    12345
+#define UDP_BUFFER_SIZE    1024
+
+/*
+ * UDP Server Thread
+ */
 static THD_WORKING_AREA(waUdpServer, 2048);
 static THD_FUNCTION(UdpServerThread, arg) {
-    int sock;
-    struct sockaddr_in server_addr, client_addr;
-    socklen_t client_len = sizeof(client_addr);
-    char buffer[UDP_BUFFER_SIZE];
-    int bytes_received;
+  (void)arg;
+  chRegSetThreadName("udp_server");
+  
+  int sock;
+  struct sockaddr_in server_addr, client_addr;
+  socklen_t client_len = sizeof(client_addr);
+  uint8_t buffer[UDP_BUFFER_SIZE];
+  int bytes_received;
+  
+  // Create UDP socket
+  sock = socket(AF_INET, SOCK_DGRAM, 0);
+  if (sock < 0) {
+    chprintf((BaseSequentialStream *)&RTT_S0, "Failed to create UDP socket\n");
+    return;
+  }
+  
+  // Configure server address
+  memset(&server_addr, 0, sizeof(server_addr));
+  server_addr.sin_family = AF_INET;
+  server_addr.sin_addr.s_addr = INADDR_ANY;  // Listen on all interfaces
+  server_addr.sin_port = htons(UDP_SERVER_PORT);
+  
+  // Bind socket to address
+  if (bind(sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+    chprintf((BaseSequentialStream *)&RTT_S0, "Failed to bind UDP socket to port %d\n", UDP_SERVER_PORT);
+    close(sock);
+    return;
+  }
+  
+  chprintf((BaseSequentialStream *)&RTT_S0, "UDP Server started on port %d\n", UDP_SERVER_PORT);
+  
+  while (true) {
+    // Wait for incoming data
+    bytes_received = recvfrom(sock, buffer, UDP_BUFFER_SIZE - 1, 0, 
+                             (struct sockaddr*)&client_addr, &client_len);
     
-    (void)arg;
-    chRegSetThreadName("udp_server");
-    
-    // Create UDP socket
-    sock = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sock < 0) {
-        chprintf((BaseSequentialStream*)&RTT_S0, "Failed to create socket\n");
-        return;
+    if (bytes_received > 0) {
+      buffer[bytes_received] = '\0';  // Null-terminate the string
+      
+      // Print received data and client info
+      chprintf((BaseSequentialStream *)&RTT_S0, 
+               "Received from %d.%d.%d.%d:%d: %s\n",
+               (client_addr.sin_addr.s_addr >> 0) & 0xFF,
+               (client_addr.sin_addr.s_addr >> 8) & 0xFF,
+               (client_addr.sin_addr.s_addr >> 16) & 0xFF,
+               (client_addr.sin_addr.s_addr >> 24) & 0xFF,
+               ntohs(client_addr.sin_port),
+               buffer);
     }
-    
-    // Configure server address
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = INADDR_ANY;
-    server_addr.sin_port = htons(UDP_SERVER_PORT);
-    
-    // Bind socket to port
-    if (bind(sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-        chprintf((BaseSequentialStream*)&RTT_S0, "Failed to bind socket to port %d\n", UDP_SERVER_PORT);
-        close(sock);
-        return;
+    else if (bytes_received < 0) {
+      chprintf((BaseSequentialStream *)&RTT_S0, "Error receiving UDP data\n");
+      chThdSleepMilliseconds(100);
     }
-    
-    chprintf((BaseSequentialStream*)&RTT_S0, "UDP server started on port %d\n", UDP_SERVER_PORT);
-    chprintf((BaseSequentialStream*)&RTT_S0, "Binding to: %s:%d\n", 
-             inet_ntoa(server_addr.sin_addr), ntohs(server_addr.sin_port));
-    
-    // Get the actual IP address this server is listening on
-    struct sockaddr_in actual_addr;
-    socklen_t actual_len = sizeof(actual_addr);
-    if (getsockname(sock, (struct sockaddr*)&actual_addr, &actual_len) == 0) {
-        chprintf((BaseSequentialStream*)&RTT_S0, "Server listening on: %s:%d\n", 
-                 inet_ntoa(actual_addr.sin_addr), ntohs(actual_addr.sin_port));
-    }
-    
-    chprintf((BaseSequentialStream*)&RTT_S0, "UDP server thread is running...\n");
-    
-    int loop_count = 0;
-    while (true) {
-        loop_count++;
-        
-        // Print heartbeat every 1000 loops (about 10 seconds)
-        if (loop_count % 1000 == 0) {
-            chprintf((BaseSequentialStream*)&RTT_S0, "UDP server heartbeat - waiting for packets...\n");
-        }
-        // Receive data
-        bytes_received = recvfrom(sock, buffer, sizeof(buffer) - 1, 0,
-                                 (struct sockaddr*)&client_addr, &client_len);
-        
-        if (bytes_received > 0) {
-            buffer[bytes_received] = '\0';
-            chprintf((BaseSequentialStream*)&RTT_S0, "Received %d bytes from %s:%d: %s\n", 
-                   bytes_received, 
-                   inet_ntoa(client_addr.sin_addr), 
-                   ntohs(client_addr.sin_port),
-                   buffer);
-            
-            // Echo back the data
-            sendto(sock, buffer, bytes_received, 0,
-                   (struct sockaddr*)&client_addr, client_len);
-        } else if (bytes_received < 0) {
-            // Error occurred
-            chprintf((BaseSequentialStream*)&RTT_S0, "UDP recv error: %d\n", bytes_received);
-        }
-        
-        // Small delay to prevent busy waiting
-        chThdSleepMilliseconds(10);
-    }
+  }
 }
-            
+
+void myLinkUpCallback(void *p) {
+  struct netif *ifc = (struct netif*) p;
+  chprintf((BaseSequentialStream *)&RTT_S0, 
+           "Ethernet reconnected! IP: %d.%d.%d.%d\n",
+           ip4_addr1(&ifc->ip_addr), ip4_addr2(&ifc->ip_addr),
+           ip4_addr3(&ifc->ip_addr), ip4_addr4(&ifc->ip_addr));
+}
+
+void myLinkDownCallback(void *p) {
+  (void)p;
+  chprintf((BaseSequentialStream *)&RTT_S0, "Ethernet disconnected!\n");
+}
+
 /*
  * Application entry point.
  */
@@ -187,160 +138,34 @@ int main(void) {
   chSysInit();
   RTTchannelObjectInit(&RTT_S0);
 
+  uint8_t mac_address[6] = {0x02, 0x12, 0x13, 0x10, 0x15, 0x05};
 
-  
-  
-  // Configure network parameters
-  static lwipthread_opts_t lwip_opts = {
-    .macaddress = NULL,                       // Use default MAC address (C2:AF:51:03:CF:46)
-#if USE_DHCP
-    .address = 0,                             // Not used for DHCP
-    .netmask = 0,                             // Not used for DHCP
-    .gateway = 0,                             // Not used for DHCP
-    .addrMode = NET_ADDRESS_DHCP,             // DHCP mode - get IP automatically
-#else
-    .address = PP_HTONL(LWIP_MAKEU32(DEVICE_IP_A, DEVICE_IP_B, DEVICE_IP_C, DEVICE_IP_D)),    // Static IP
-    .netmask = PP_HTONL(LWIP_MAKEU32(NETMASK_A, NETMASK_B, NETMASK_C, NETMASK_D)),    // Subnet mask  
-    .gateway = PP_HTONL(LWIP_MAKEU32(GATEWAY_A, GATEWAY_B, GATEWAY_C, GATEWAY_D)),      // Gateway
-    .addrMode = NET_ADDRESS_STATIC,            // Static IP mode
-#endif
-#if LWIP_NETIF_HOSTNAME
-    .ourHostName = "STM32_Device",            // Hostname (optional)
-#endif
-    .link_up_cb = NULL,                       // Link up callback (optional)
-    .link_down_cb = NULL                      // Link down callback (optional)
+  ip4_addr_t ip_addr, gateway_addr, netmask_addr;
+  IP4_ADDR(&ip_addr, 192, 168, 0, 100);            // IP: 192.168.0.100
+  IP4_ADDR(&gateway_addr, 192, 168, 0, 1);         // Gateway: 192.168.0.1
+  IP4_ADDR(&netmask_addr, 255, 255, 255, 0);       // Netmask: 255.255.255.0
+
+  // Set up the lwIP thread options
+  lwipthread_opts_t lwipthread_opts = {
+      .macaddress = mac_address,                   // MAC address array
+      .address = ip_addr.addr,                     // IP address (32-bit)
+      .netmask = netmask_addr.addr,                // Subnet mask (32-bit)
+      .gateway = gateway_addr.addr,                // Gateway address (32-bit)
+      .addrMode = NET_ADDRESS_STATIC,              // Address mode: STATIC, DHCP, or AUTO
+      .ourHostName = "ds-eth-comm",                // Hostname (optional)
+      .link_up_cb = myLinkUpCallback,              // Link up callback (optional)
+      .link_down_cb = myLinkDownCallback           // Link down callback (optional)
   };
   
-  lwipInit(&lwip_opts);
-  /*
-   * Activates the serial driver 3 using the driver default configuration.
-   */
-  // sdStart(&SD3, NULL);
-  
-  /*
-   * Wait for network initialization
-   */
-#if USE_DHCP
-  chprintf((BaseSequentialStream*)&RTT_S0, "Starting DHCP client...\n");
-#else
-  chprintf((BaseSequentialStream*)&RTT_S0, "Using static IP configuration...\n");
-#endif
-  chThdSleepMilliseconds(1000);
-  
-  // Get the default network interface
-  struct netif *netif = netif_default;
-  if (netif != NULL) {
-    chprintf((BaseSequentialStream*)&RTT_S0, "Network interface found\n");
-    chprintf((BaseSequentialStream*)&RTT_S0, "MAC Address: %02X:%02X:%02X:%02X:%02X:%02X\n",
-             netif->hwaddr[0], netif->hwaddr[1], netif->hwaddr[2],
-             netif->hwaddr[3], netif->hwaddr[4], netif->hwaddr[5]);
-    
-    // Check link status
-    if (netif_is_link_up(netif)) {
-      chprintf((BaseSequentialStream*)&RTT_S0, "Link is UP\n");
-    } else {
-      chprintf((BaseSequentialStream*)&RTT_S0, "Link is DOWN - check cable connection\n");
-    }
-    
-    // Wait a bit for link to stabilize
-    chprintf((BaseSequentialStream*)&RTT_S0, "Waiting for link to stabilize...\n");
-    chThdSleepMilliseconds(5000);
-    
-    // Check link status again
-    if (netif_is_link_up(netif)) {
-      chprintf((BaseSequentialStream*)&RTT_S0, "Link is UP after wait\n");
-    } else {
-      chprintf((BaseSequentialStream*)&RTT_S0, "Link is still DOWN after wait\n");
-    }
-    
-#if USE_DHCP
-    // Only attempt DHCP if link is up
-    if (netif_is_link_up(netif)) {
-      chprintf((BaseSequentialStream*)&RTT_S0, "Link is UP - starting DHCP...\n");
-      // Wait for DHCP to complete (up to 10 seconds)
-      int dhcp_timeout = 10; // 10 seconds (100 * 100ms)
-      while (dhcp_timeout > 0 && !netif_is_up(netif)) {
-      chThdSleepMilliseconds(1000);
-      dhcp_timeout--;
-      if (dhcp_timeout % 10 == 0) { // Print every second
-        chprintf((BaseSequentialStream*)&RTT_S0, "Waiting for DHCP... (%d seconds)\n", dhcp_timeout/10);
-        // Check current IP status during wait
-        const ip4_addr_t *current_ip = netif_ip4_addr(netif);
-        chprintf((BaseSequentialStream*)&RTT_S0, "Current IP: %s\n", ip4addr_ntoa(current_ip));
-      }
-    }
-    
-    if (netif_is_up(netif)) {
-      chprintf((BaseSequentialStream*)&RTT_S0, "DHCP successful!\n");
-      // Wait a bit more for IP to be fully assigned
-      chThdSleepMilliseconds(1000);
-      
-      // Check if we actually got valid IP configuration
-      const ip4_addr_t *ip = netif_ip4_addr(netif);
-      const ip4_addr_t *mask = netif_ip4_netmask(netif);
-      const ip4_addr_t *gw = netif_ip4_gw(netif);
-      
-      if (ip4_addr_get_u32(ip) == 0) {
-        chprintf((BaseSequentialStream*)&RTT_S0, "WARNING: No valid IP address received!\n");
-        chprintf((BaseSequentialStream*)&RTT_S0, "DHCP completed but no IP assigned\n");
-        chprintf((BaseSequentialStream*)&RTT_S0, "Debug: IP=0x%08X, Mask=0x%08X, GW=0x%08X\n", 
-                 ip4_addr_get_u32(ip), ip4_addr_get_u32(mask), ip4_addr_get_u32(gw));
-      } else {
-        chprintf((BaseSequentialStream*)&RTT_S0, "Valid IP configuration received\n");
-        
-        // Additional network status check
-        chprintf((BaseSequentialStream*)&RTT_S0, "Network Status Check:\n");
-        chprintf((BaseSequentialStream*)&RTT_S0, "  Link UP: %s\n", netif_is_link_up(netif) ? "YES" : "NO");
-        chprintf((BaseSequentialStream*)&RTT_S0, "  Interface UP: %s\n", netif_is_up(netif) ? "YES" : "NO");
-        chprintf((BaseSequentialStream*)&RTT_S0, "  IP: %s\n", ip4addr_ntoa(ip));
-        chprintf((BaseSequentialStream*)&RTT_S0, "  Mask: %s\n", ip4addr_ntoa(mask));
-        chprintf((BaseSequentialStream*)&RTT_S0, "  Gateway: %s\n", ip4addr_ntoa(gw));
-      }
-      } else {
-        chprintf((BaseSequentialStream*)&RTT_S0, "DHCP failed or timeout\n");
-      }
-    } else {
-      chprintf((BaseSequentialStream*)&RTT_S0, "Link is DOWN - skipping DHCP\n");
-    }
-#else
-    // For static IP, just wait a bit for interface to come up
-    chThdSleepMilliseconds(1000);
-#endif
-
-    if (netif_is_up(netif)) {
-      chprintf((BaseSequentialStream*)&RTT_S0, "Network interface is UP\n");
-      chprintf((BaseSequentialStream*)&RTT_S0, "IP Address: %s\n", ip4addr_ntoa(netif_ip4_addr(netif)));
-      chprintf((BaseSequentialStream*)&RTT_S0, "Netmask: %s\n", ip4addr_ntoa(netif_ip4_netmask(netif)));
-      chprintf((BaseSequentialStream*)&RTT_S0, "Gateway: %s\n", ip4addr_ntoa(netif_ip4_gw(netif)));
-    } else {
-      chprintf((BaseSequentialStream*)&RTT_S0, "Network interface is DOWN\n");
-    }
-  } else {
-    chprintf((BaseSequentialStream*)&RTT_S0, "Network interface not available\n");
-  }
+  lwipInit(&lwipthread_opts);
 
   /*
    * Creates the example threads.
    */
   chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO+1, Thread1, NULL);
-  chThdCreateStatic(waUdpServer, sizeof(waUdpServer), NORMALPRIO+2, UdpServerThread, NULL);
+  chThdCreateStatic(waUdpServer, sizeof(waUdpServer), NORMALPRIO, UdpServerThread, NULL);
 
-  /*
-   * Normal main() thread activity, in this demo it does nothing except
-   * sleeping in a loop and check the button state.
-   */
-  int status_count = 0;
   while (1) {
-    // Check network status every 10 seconds
-    if (status_count % 20 == 0) { // Every 10 seconds (20 * 500ms)
-      if (netif != NULL) {
-        chprintf((BaseSequentialStream*)&RTT_S0, "Network Status: Link=%s, Up=%s, IP=%s\n",
-                 netif_is_link_up(netif) ? "UP" : "DOWN",
-                 netif_is_up(netif) ? "UP" : "DOWN",
-                 ip4addr_ntoa(netif_ip4_addr(netif)));
-      }
-    }
-    status_count++;
     chThdSleepMilliseconds(500);
   }
 }

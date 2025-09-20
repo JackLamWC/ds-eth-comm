@@ -4,6 +4,10 @@
         "lwipopts.h": "c",
         "lwipthread.h": "c",
         "hal.h": "c",
-        "sockets.h": "c"
+        "sockets.h": "c",
+        "chprintf.h": "c",
+        "osal.h": "c",
+        "stddef.h": "c",
+        "errno.h": "c"
     }
 }

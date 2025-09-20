@@ -12,7 +12,7 @@
             "type": "cortex-debug",
             "runToEntryPoint": "main",
             "servertype": "jlink",
-            "gdbPath": "C:\\arm-none-eabi\\14.2_rel1\\bin\\arm-none-eabi-gdb.exe",
+            "gdbPath": "C:\\Program Files (x86)\\GNU Arm Embedded Toolchain\\10 2021.10\\bin\\arm-none-eabi-gdb.exe",
             "device": "STM32H750VB",
             "svdFile": "${workspaceFolder}/STM32H750.svd",
             "serverpath": "C:\\Users\\jack\\Desktop\\jlink\\JLink_V860\\JLinkGDBServerCL.exe",

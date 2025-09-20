@@ -146,8 +146,8 @@
 #define GPIOE_SDRAM_D6              9U
 #define GPIOE_SDRAM_D7              10U
 #define GPIOE_SDRAM_D8              11U
-#define GPIOE_SDRAM_D9              12U
-#define GPIOE_SDRAM_D10             13U
+#define GPIOE_PIN12                 12U
+#define GPIOE_LED_RED                13U
 #define GPIOE_SDRAM_D11             14U
 #define GPIOE_SDRAM_D12             15U
 
@@ -308,8 +308,7 @@
 #define LINE_SDRAM_D6               PAL_LINE(GPIOE, 9U)
 #define LINE_SDRAM_D7               PAL_LINE(GPIOE, 10U)
 #define LINE_SDRAM_D8               PAL_LINE(GPIOE, 11U)
-#define LINE_SDRAM_D9               PAL_LINE(GPIOE, 12U)
-#define LINE_SDRAM_D10              PAL_LINE(GPIOE, 13U)
+#define LINE_LED_RED_E12            PAL_LINE(GPIOE, 13U)
 #define LINE_SDRAM_D11              PAL_LINE(GPIOE, 14U)
 #define LINE_SDRAM_D12              PAL_LINE(GPIOE, 15U)
 #define LINE_SDRAM_A0               PAL_LINE(GPIOF, 0U)
@@ -923,8 +922,8 @@
                                      PIN_MODE_ALTERNATE(GPIOE_SDRAM_D6) |   \
                                      PIN_MODE_ALTERNATE(GPIOE_SDRAM_D7) |   \
                                      PIN_MODE_ALTERNATE(GPIOE_SDRAM_D8) |   \
-                                     PIN_MODE_ALTERNATE(GPIOE_SDRAM_D9) |   \
-                                     PIN_MODE_ALTERNATE(GPIOE_SDRAM_D10) |  \
+                                     PIN_MODE_INPUT(GPIOE_PIN12) |   \
+                                     PIN_MODE_OUTPUT(GPIOE_LED_RED) |  \
                                      PIN_MODE_ALTERNATE(GPIOE_SDRAM_D11) |  \
                                      PIN_MODE_ALTERNATE(GPIOE_SDRAM_D12))
 #define VAL_GPIOE_OTYPER            (PIN_OTYPE_PUSHPULL(GPIOE_SDRAM_NBL0) | \
@@ -939,8 +938,8 @@
                                      PIN_OTYPE_PUSHPULL(GPIOE_SDRAM_D6) |   \
                                      PIN_OTYPE_PUSHPULL(GPIOE_SDRAM_D7) |   \
                                      PIN_OTYPE_PUSHPULL(GPIOE_SDRAM_D8) |   \
-                                     PIN_OTYPE_PUSHPULL(GPIOE_SDRAM_D9) |   \
-                                     PIN_OTYPE_PUSHPULL(GPIOE_SDRAM_D10) |  \
+                                     PIN_OTYPE_PUSHPULL(GPIOE_PIN12) |   \
+                                     PIN_OTYPE_PUSHPULL(GPIOE_LED_RED) |  \
                                      PIN_OTYPE_PUSHPULL(GPIOE_SDRAM_D11) |  \
                                      PIN_OTYPE_PUSHPULL(GPIOE_SDRAM_D12))
 #define VAL_GPIOE_OSPEEDR           (PIN_OSPEED_HIGH(GPIOE_SDRAM_NBL0) |    \
@@ -955,8 +954,8 @@
                                      PIN_OSPEED_HIGH(GPIOE_SDRAM_D6) |      \
                                      PIN_OSPEED_HIGH(GPIOE_SDRAM_D7) |      \
                                      PIN_OSPEED_HIGH(GPIOE_SDRAM_D8) |      \
-                                     PIN_OSPEED_HIGH(GPIOE_SDRAM_D9) |      \
-                                     PIN_OSPEED_HIGH(GPIOE_SDRAM_D10) |     \
+                                     PIN_OSPEED_HIGH(GPIOE_PIN12) |      \
+                                     PIN_OSPEED_HIGH(GPIOE_LED_RED) |     \
                                      PIN_OSPEED_HIGH(GPIOE_SDRAM_D11) |     \
                                      PIN_OSPEED_HIGH(GPIOE_SDRAM_D12))
 #define VAL_GPIOE_PUPDR             (PIN_PUPDR_FLOATING(GPIOE_SDRAM_NBL0) | \
@@ -971,8 +970,8 @@
                                      PIN_PUPDR_FLOATING(GPIOE_SDRAM_D6) |   \
                                      PIN_PUPDR_FLOATING(GPIOE_SDRAM_D7) |   \
                                      PIN_PUPDR_FLOATING(GPIOE_SDRAM_D8) |   \
-                                     PIN_PUPDR_FLOATING(GPIOE_SDRAM_D9) |   \
-                                     PIN_PUPDR_FLOATING(GPIOE_SDRAM_D10) |  \
+                                     PIN_PUPDR_FLOATING(GPIOE_PIN12) |   \
+                                     PIN_PUPDR_FLOATING(GPIOE_LED_RED) |  \
                                      PIN_PUPDR_FLOATING(GPIOE_SDRAM_D11) |  \
                                      PIN_PUPDR_FLOATING(GPIOE_SDRAM_D12))
 #define VAL_GPIOE_ODR               (PIN_ODR_HIGH(GPIOE_SDRAM_NBL0) |       \
@@ -987,8 +986,8 @@
                                      PIN_ODR_HIGH(GPIOE_SDRAM_D6) |         \
                                      PIN_ODR_HIGH(GPIOE_SDRAM_D7) |         \
                                      PIN_ODR_HIGH(GPIOE_SDRAM_D8) |         \
-                                     PIN_ODR_HIGH(GPIOE_SDRAM_D9) |         \
-                                     PIN_ODR_HIGH(GPIOE_SDRAM_D10) |        \
+                                     PIN_ODR_HIGH(GPIOE_PIN12) |         \
+                                     PIN_ODR_HIGH(GPIOE_LED_RED) |        \
                                      PIN_ODR_HIGH(GPIOE_SDRAM_D11) |        \
                                      PIN_ODR_HIGH(GPIOE_SDRAM_D12))
 #define VAL_GPIOE_AFRL              (PIN_AFIO_AF(GPIOE_SDRAM_NBL0, 12U) |   \
@@ -1003,8 +1002,8 @@
                                      PIN_AFIO_AF(GPIOE_SDRAM_D6, 12U) |     \
                                      PIN_AFIO_AF(GPIOE_SDRAM_D7, 12U) |     \
                                      PIN_AFIO_AF(GPIOE_SDRAM_D8, 12U) |     \
-                                     PIN_AFIO_AF(GPIOE_SDRAM_D9, 12U) |     \
-                                     PIN_AFIO_AF(GPIOE_SDRAM_D10, 12U) |    \
+                                     PIN_AFIO_AF(GPIOE_PIN12, 0U) |     \
+                                     PIN_AFIO_AF(GPIOE_LED_RED, 0U) |    \
                                      PIN_AFIO_AF(GPIOE_SDRAM_D11, 12U) |    \
                                      PIN_AFIO_AF(GPIOE_SDRAM_D12, 12U))
 
