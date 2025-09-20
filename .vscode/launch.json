@@ -1,0 +1,21 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Cortex Debug",
+            "cwd": "${workspaceFolder}",
+            "executable": "${workspaceFolder}/build/ch.elf",
+            "request": "launch",
+            "type": "cortex-debug",
+            "runToEntryPoint": "main",
+            "servertype": "jlink",
+            "gdbPath": "C:\\arm-none-eabi\\14.2_rel1\\bin\\arm-none-eabi-gdb.exe",
+            "device": "STM32H750VB",
+            "svdFile": "${workspaceFolder}/STM32H750.svd",
+            "serverpath": "C:\\Users\\jack\\Desktop\\jlink\\JLink_V860\\JLinkGDBServerCL.exe",
+        }
+    ]
+}

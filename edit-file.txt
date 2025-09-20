@@ -1,0 +1,32 @@
+- add $(CHIBIOS)/os/various/evtimer.c to line 10 to lwip.mk
+
+- edit ChibiOS_21.11.x\os\hal\ports\STM32\LLD\MACv1\hal_mac_lld.c 
+
+#if !defined(BOARD_PHY_ADDRESS)
+/**
+ * @brief   PHY address detection.
+ *
+ * @param[in] macp      pointer to the @p MACDriver object
+ */
+static void mii_find_phy(MACDriver *macp) {
+  uint32_t i;
+
+#if STM32_MAC_PHY_TIMEOUT > 0
+  unsigned n = STM32_MAC_PHY_TIMEOUT;
+ do {
+#endif
+    for (i = 0U; i <= 31U; i++) {
+      macp->phyaddr = i << ETH_MACMDIOAR_PA_Pos;
+      if ((mii_read(macp, MII_PHYSID1) == (BOARD_PHY_ID >> 16U)) &&
+          ((mii_read(macp, MII_PHYSID2) & 0xFFF0U) == (BOARD_PHY_ID & 0xFFF0U))) {
+        return;
+      }
+    }
+#if STM32_MAC_PHY_TIMEOUT > 0
+    n--;
+  } while (n > 0U);
+#endif
+  /* Wrong or defective board.*/
+  osalSysHalt("MAC failure");
+}
+#endif
