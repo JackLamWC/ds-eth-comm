@@ -23,10 +23,6 @@
 #include "chprintf.h"
 #include "SEGGER_RTT_Channel.h"
 
-#define LWIP_PORT_INIT_IPADDR(addr)   IP4_ADDR((addr), 192,168,1,200)
-#define LWIP_PORT_INIT_GW(addr)       IP4_ADDR((addr), 192,168,1,1)
-#define LWIP_PORT_INIT_NETMASK(addr)  IP4_ADDR((addr), 255,255,255,0)
-
 
 /*
  * This is a periodic thread that does absolutely nothing except flashing
@@ -123,6 +119,82 @@ void myLinkDownCallback(void *p) {
   chprintf((BaseSequentialStream *)&RTT_S0, "Ethernet disconnected!\n");
 }
 
+#if HAL_USBH_USE_HID
+#include "usbh/dev/hid.h"
+#include "chprintf.h"
+
+static THD_WORKING_AREA(waTestHID, 1024);
+
+static void _hid_report_callback(USBHHIDDriver *hidp, uint16_t len) {
+    uint8_t *report = (uint8_t *)hidp->config->report_buffer;
+
+    if (hidp->type == USBHHID_DEVTYPE_BOOT_MOUSE) {
+        chprintf((BaseSequentialStream *)&RTT_S0, "Mouse report: buttons=%02x, Dx=%d, Dy=%d\n",
+                report[0],
+                (int8_t)report[1],
+                (int8_t)report[2]);
+    } else if (hidp->type == USBHHID_DEVTYPE_BOOT_KEYBOARD) {
+        chprintf((BaseSequentialStream *)&RTT_S0, "Keyboard report: modifier=%02x, keys=%02x %02x %02x %02x %02x %02x\n",
+                report[0],
+                report[2],
+                report[3],
+                report[4],
+                report[5],
+                report[6],
+                report[7]);
+    } else {
+        chprintf((BaseSequentialStream *)&RTT_S0, "Generic report, %d bytes\n", len);
+    }
+}
+
+static USBH_DEFINE_BUFFER(uint8_t report[HAL_USBHHID_MAX_INSTANCES][8]);
+static USBHHIDConfig hidcfg[HAL_USBHHID_MAX_INSTANCES];
+
+static void ThreadTestHID(void *p) {
+  (void)p;
+  uint8_t i;
+  static uint8_t kbd_led_states[HAL_USBHHID_MAX_INSTANCES];
+
+  chRegSetThreadName("HID");
+
+  for (i = 0; i < HAL_USBHHID_MAX_INSTANCES; i++) {
+      hidcfg[i].cb_report = _hid_report_callback;
+      hidcfg[i].protocol = USBHHID_PROTOCOL_REPORT;
+      hidcfg[i].report_buffer = report[i];
+      hidcfg[i].report_len = 8;
+  }
+
+  chprintf((BaseSequentialStream *)&RTT_S0, "HID Thread started\n");  // Add this
+
+  for (;;) {
+      for (i = 0; i < HAL_USBHHID_MAX_INSTANCES; i++) {
+          USBHHIDDriver *const hidp = &USBHHIDD[i];
+          usbhhid_state_t state = usbhhidGetState(hidp);
+          
+          // Add debug output
+          if (state != USBHHID_STATE_STOP) {
+              chprintf((BaseSequentialStream *)&RTT_S0, "HID%d: state=%d, type=%d\n", 
+                      i, state, usbhhidGetType(hidp));
+          }
+          
+          if (state == USBHHID_STATE_ACTIVE) {
+              chprintf((BaseSequentialStream *)&RTT_S0, "HID: Connected, HID%d\n", i);
+              usbhhidStart(hidp, &hidcfg[i]);
+              if (usbhhidGetType(hidp) != USBHHID_DEVTYPE_GENERIC) {
+                  usbhhidSetIdle(hidp, 0, 0);
+              }
+              kbd_led_states[i] = 1;
+          } else if (state == USBHHID_STATE_READY) {
+              // ... rest of your code
+          }
+      }
+      chThdSleepMilliseconds(200);
+  }
+}
+#endif
+
+
+
 /*
  * Application entry point.
  */
@@ -136,6 +208,7 @@ int main(void) {
    */
   halInit();
   chSysInit();
+  usbhInit();
   RTTchannelObjectInit(&RTT_S0);
 
   uint8_t mac_address[6] = {0x02, 0x12, 0x13, 0x10, 0x15, 0x05};
@@ -156,16 +229,37 @@ int main(void) {
       .link_up_cb = myLinkUpCallback,              // Link up callback (optional)
       .link_down_cb = myLinkDownCallback           // Link down callback (optional)
   };
-  
-  lwipInit(&lwipthread_opts);
 
+  lwipInit(&lwipthread_opts);
   /*
    * Creates the example threads.
    */
   chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO+1, Thread1, NULL);
   chThdCreateStatic(waUdpServer, sizeof(waUdpServer), NORMALPRIO, UdpServerThread, NULL);
+  chThdCreateStatic(waTestHID, sizeof(waTestHID), NORMALPRIO, ThreadTestHID, NULL);
+
+  #if STM32_USBH_USE_OTG1
+      usbhStart(&USBHD1);
+      chprintf((BaseSequentialStream *)&RTT_S0, "USBH OTG2 start requested\n");
+  #endif
+  #if STM32_USBH_USE_OTG2
+      usbhStart(&USBHD2);
+      chprintf((BaseSequentialStream *)&RTT_S0, "USBH OTG2 start requested\n");
+  #endif
 
   while (1) {
+    #if STM32_USBH_USE_OTG2
+      usbhMainLoop(&USBHD2);
+    #endif
+    #if STM32_USBH_USE_OTG1
+      usbhMainLoop(&USBHD1);
+    #endif
+    #if STM32_USBH_USE_OTG2
+      uint32_t isHostMode = &USBHD2.otg->GINTSTS;
+    #endif
+    #if STM32_USBH_USE_OTG1
+      uint32_t status = &USBHD1.rootport.c_status;
+    #endif
     chThdSleepMilliseconds(500);
   }
 }

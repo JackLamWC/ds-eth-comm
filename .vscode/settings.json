@@ -8,6 +8,14 @@
         "chprintf.h": "c",
         "osal.h": "c",
         "stddef.h": "c",
-        "errno.h": "c"
+        "errno.h": "c",
+        "usb_app.h": "c",
+        "usb.h": "c",
+        "ch.h": "c",
+        "stm32h7xx_hal_hcd.h": "c",
+        "usbh_lld.h": "c",
+        "cmsis_os.h": "c",
+        "stm32h750xx.h": "c",
+        "hid.h": "c"
     }
 }

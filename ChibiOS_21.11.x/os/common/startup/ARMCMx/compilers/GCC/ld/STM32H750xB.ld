@@ -136,4 +136,3 @@ INCLUDE rules_data.ld
 
 /* Memory rules inclusion.*/
 INCLUDE rules_memory.ld
-

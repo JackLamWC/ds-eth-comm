@@ -478,7 +478,7 @@
  * USB driver system settings.
  */
 #define STM32_USB_USE_OTG1                  FALSE
-#define STM32_USB_USE_OTG2                  FALSE
+#define STM32_USB_USE_OTG2                  TRUE
 #define STM32_USB_OTG1_IRQ_PRIORITY         14
 #define STM32_USB_OTG2_IRQ_PRIORITY         14
 #define STM32_USB_OTG1_RX_FIFO_SIZE         512
@@ -499,5 +499,133 @@
 #define STM32_WSPI_QUADSPI1_MDMA_CHANNEL    STM32_MDMA_CHANNEL_ID_ANY
 #define STM32_WSPI_QUADSPI1_MDMA_PRIORITY   1
 #define STM32_WSPI_MDMA_ERROR_HOOK(wspip)   osalSysHalt("MDMA failure")
+
+/*===========================================================================*/
+/* USBH driver related settings.                                             */
+/*===========================================================================*/
+
+/* main driver */
+#define HAL_USBH_PORT_DEBOUNCE_TIME                   200
+#define HAL_USBH_PORT_RESET_TIMEOUT                   500
+#define HAL_USBH_DEVICE_ADDRESS_STABILIZATION         20
+#define HAL_USBH_CONTROL_REQUEST_DEFAULT_TIMEOUT	  OSAL_MS2I(1000)
+
+/* MSD */
+#define HAL_USBH_USE_MSD                              FALSE
+
+#define HAL_USBHMSD_MAX_LUNS                          1
+#define HAL_USBHMSD_MAX_INSTANCES                     1
+
+/* FTDI */
+#define HAL_USBH_USE_FTDI                             FALSE
+
+#define HAL_USBHFTDI_MAX_PORTS                        1
+#define HAL_USBHFTDI_MAX_INSTANCES                    1
+#define HAL_USBHFTDI_DEFAULT_SPEED                    9600
+#define HAL_USBHFTDI_DEFAULT_FRAMING                  (USBHFTDI_FRAMING_DATABITS_8 | USBHFTDI_FRAMING_PARITY_NONE | USBHFTDI_FRAMING_STOP_BITS_1)
+#define HAL_USBHFTDI_DEFAULT_FRAMING                  (USBHFTDI_FRAMING_DATABITS_8 | USBHFTDI_FRAMING_PARITY_NONE | USBHFTDI_FRAMING_STOP_BITS_1)
+#define HAL_USBHFTDI_DEFAULT_HANDSHAKE                USBHFTDI_HANDSHAKE_NONE
+#define HAL_USBHFTDI_DEFAULT_XON                      0x11
+#define HAL_USBHFTDI_DEFAULT_XOFF                     0x13
+
+/* AOA */
+#define HAL_USBH_USE_AOA                              FALSE
+
+#define HAL_USBHAOA_MAX_INSTANCES                     1
+/* Uncomment this if you need a filter for AOA devices:
+ * #define HAL_USBHAOA_FILTER_CALLBACK                _try_aoa
+ */
+#define HAL_USBHAOA_DEFAULT_MANUFACTURER              "Diego MFG & Co."
+#define HAL_USBHAOA_DEFAULT_MODEL                     "Diego's device"
+#define HAL_USBHAOA_DEFAULT_DESCRIPTION               "Description of this device..."
+#define HAL_USBHAOA_DEFAULT_VERSION                   "1.0"
+#define HAL_USBHAOA_DEFAULT_URI                       NULL
+#define HAL_USBHAOA_DEFAULT_SERIAL                    NULL
+#define HAL_USBHAOA_DEFAULT_AUDIO_MODE                USBHAOA_AUDIO_MODE_DISABLED
+
+/* UVC */
+#define HAL_USBH_USE_UVC                              FALSE
+
+#define HAL_USBHUVC_MAX_INSTANCES                     1
+#define HAL_USBHUVC_MAX_MAILBOX_SZ                    70
+#define HAL_USBHUVC_WORK_RAM_SIZE                     20000
+#define HAL_USBHUVC_STATUS_PACKETS_COUNT              10
+
+/* HID */
+#define HAL_USBH_USE_HID                              TRUE
+#define HAL_USBHHID_MAX_INSTANCES                     2
+#define HAL_USBHHID_USE_INTERRUPT_OUT                 FALSE
+
+/* HUB */
+#define HAL_USBH_USE_HUB                              FALSE
+
+#define HAL_USBHHUB_MAX_INSTANCES                     1
+#define HAL_USBHHUB_MAX_PORTS                         6
+
+#define HAL_USBH_USE_ADDITIONAL_CLASS_DRIVERS         FALSE
+
+/* debug */
+#define USBH_DEBUG_ENABLE                             FALSE
+#define USBH_DEBUG_MULTI_HOST                         FALSE
+#define USBH_DEBUG_SINGLE_HOST_SELECTION			  USBHD2
+#define USBH_DEBUG_BUFFER                             2500
+#define USBH_DEBUG_OUTPUT_CALLBACK                    usbh_debug_output
+
+#define USBH_DEBUG_ENABLE_TRACE                       FALSE
+#define USBH_DEBUG_ENABLE_INFO                        TRUE
+#define USBH_DEBUG_ENABLE_WARNINGS                    TRUE
+#define USBH_DEBUG_ENABLE_ERRORS                      TRUE
+
+#define USBH_LLD_DEBUG_ENABLE_TRACE                   FALSE
+#define USBH_LLD_DEBUG_ENABLE_INFO                    TRUE
+#define USBH_LLD_DEBUG_ENABLE_WARNINGS                TRUE
+#define USBH_LLD_DEBUG_ENABLE_ERRORS                  TRUE
+
+#define USBHHUB_DEBUG_ENABLE_TRACE                    FALSE
+#define USBHHUB_DEBUG_ENABLE_INFO                     TRUE
+#define USBHHUB_DEBUG_ENABLE_WARNINGS                 TRUE
+#define USBHHUB_DEBUG_ENABLE_ERRORS                   TRUE
+
+#define USBHMSD_DEBUG_ENABLE_TRACE                    FALSE
+#define USBHMSD_DEBUG_ENABLE_INFO                     TRUE
+#define USBHMSD_DEBUG_ENABLE_WARNINGS                 TRUE
+#define USBHMSD_DEBUG_ENABLE_ERRORS                   TRUE
+
+#define USBHUVC_DEBUG_ENABLE_TRACE                    FALSE
+#define USBHUVC_DEBUG_ENABLE_INFO                     TRUE
+#define USBHUVC_DEBUG_ENABLE_WARNINGS                 TRUE
+#define USBHUVC_DEBUG_ENABLE_ERRORS                   TRUE
+
+#define USBHFTDI_DEBUG_ENABLE_TRACE                   FALSE
+#define USBHFTDI_DEBUG_ENABLE_INFO                    TRUE
+#define USBHFTDI_DEBUG_ENABLE_WARNINGS                TRUE
+#define USBHFTDI_DEBUG_ENABLE_ERRORS                  TRUE
+
+#define USBHAOA_DEBUG_ENABLE_TRACE                    FALSE
+#define USBHAOA_DEBUG_ENABLE_INFO                     TRUE
+#define USBHAOA_DEBUG_ENABLE_WARNINGS                 TRUE
+#define USBHAOA_DEBUG_ENABLE_ERRORS                   TRUE
+
+#define USBHHID_DEBUG_ENABLE_TRACE                    FALSE
+#define USBHHID_DEBUG_ENABLE_INFO                     TRUE
+#define USBHHID_DEBUG_ENABLE_WARNINGS                 TRUE
+#define USBHHID_DEBUG_ENABLE_ERRORS                   TRUE
+
+#define STM32_OTG_FS_CHANNELS_NUMBER          8
+#define STM32_OTG_HS_CHANNELS_NUMBER          12
+
+#define STM32_USBH_USE_OTG1                   0
+#define BOARD_OTG_NOVBUSSENS                  TRUE
+#define STM32_OTG_FS_RXFIFO_SIZE              1024
+#define STM32_OTG_FS_PTXFIFO_SIZE             128
+#define STM32_OTG_FS_NPTXFIFO_SIZE            128
+
+#define STM32_USBH_USE_OTG2                   1
+#define STM32_OTG_HS_RXFIFO_SIZE              2048
+#define STM32_OTG_HS_PTXFIFO_SIZE             1024
+#define STM32_OTG_HS_NPTXFIFO_SIZE            1024
+
+#define STM32_USBH_MIN_QSPACE                 4
+#define STM32_USBH_CHANNELS_NP                4
 
 #endif /* MCUCONF_H */

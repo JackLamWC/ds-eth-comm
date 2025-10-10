@@ -46,6 +46,7 @@ include $(CHIBIOS)/os/hal/ports/STM32/LLD/SYSTICKv1/driver.mk
 include $(CHIBIOS)/os/hal/ports/STM32/LLD/TIMv1/driver.mk
 include $(CHIBIOS)/os/hal/ports/STM32/LLD/USARTv3/driver.mk
 include $(CHIBIOS)/os/hal/ports/STM32/LLD/xWDGv1/driver.mk
+include ${CHIBIOS}/os/hal/ports/STM32/LLD/USBHv1/driver.mk
 
 # Shared variables
 ALLCSRC += $(PLATFORMSRC)

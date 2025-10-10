@@ -30,3 +30,6 @@ static void mii_find_phy(MACDriver *macp) {
   osalSysHalt("MAC failure");
 }
 #endif
+
+- C:\Users\jack\Desktop\ds-eth-comm\ChibiOS_21.11.x\os\common\startup\ARMCMx\compilers\GCC\ld\rules_code.ld
+- edit mpu no cache memory

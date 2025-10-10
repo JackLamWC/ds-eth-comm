@@ -201,6 +201,21 @@
 #define HAL_USE_WSPI                        FALSE
 #endif
 
+/**
+ * @brief   Enables the USBH subsystem.
+ */
+#if !defined(HAL_USE_USBH) || defined(__DOXYGEN__)
+#define HAL_USE_USBH                TRUE
+#endif
+
+/**
+ * @brief   Enables the USB_MSD subsystem.
+ */
+#if !defined(HAL_USE_USB_MSD) || defined(__DOXYGEN__)
+#define HAL_USE_USB_MSD             FALSE
+#endif
+
+
 /*===========================================================================*/
 /* PAL driver related settings.                                              */
 /*===========================================================================*/

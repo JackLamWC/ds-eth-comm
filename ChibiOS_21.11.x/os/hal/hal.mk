@@ -94,6 +94,27 @@ endif
 ifneq ($(findstring HAL_USE_WSPI TRUE,$(HALCONF)),)
 HALSRC += $(CHIBIOS)/os/hal/src/hal_wspi.c
 endif
+ifneq ($(findstring HAL_USE_USBH TRUE,$(HALCONF)),)
+HALSRC_CONTRIB += $(CHIBIOS)/os/hal/src/hal_usbh.c \
+                  $(CHIBIOS)/os/hal/src/usbh/hal_usbh_debug.c \
+                  $(CHIBIOS)/os/hal/src/usbh/hal_usbh_desciter.c \
+                  $(CHIBIOS)/os/hal/src/usbh/hal_usbh_hub.c
+endif
+ifneq ($(findstring HAL_USBH_USE_MSD TRUE,$(HALCONF)),)
+HALSRC_CONTRIB += $(CHIBIOS)/os/hal/src/usbh/hal_usbh_msd.c
+endif
+ifneq ($(findstring HAL_USBH_USE_FTDI TRUE,$(HALCONF)),)
+HALSRC_CONTRIB += $(CHIBIOS)/os/hal/src/hal_usbh_ftdi.c 
+endif
+ifneq ($(findstring HAL_USBH_USE_AOA TRUE,$(HALCONF)),)
+HALSRC_CONTRIB += $(CHIBIOS)/os/hal/src/hal_usbh_aoa.c 
+endif
+ifneq ($(findstring HAL_USBH_USE_HID TRUE,$(HALCONF)),)
+HALSRC_CONTRIB += $(CHIBIOS)/os/hal/src/hal_usbh_hid.c 
+endif
+ifneq ($(findstring HAL_USBH_USE_UVC TRUE,$(HALCONF)),)
+HALSRC_CONTRIB += $(CHIBIOS)/os/hal/src/usbh/hal_usbh_uvc.c
+endif
 else
 HALSRC = $(CHIBIOS)/os/hal/src/hal.c \
          $(CHIBIOS)/os/hal/src/hal_st.c \
@@ -123,7 +144,16 @@ HALSRC = $(CHIBIOS)/os/hal/src/hal.c \
          $(CHIBIOS)/os/hal/src/hal_uart.c \
          $(CHIBIOS)/os/hal/src/hal_usb.c \
          $(CHIBIOS)/os/hal/src/hal_wdg.c \
-         $(CHIBIOS)/os/hal/src/hal_wspi.c
+         $(CHIBIOS)/os/hal/src/hal_wspi.c \
+         $(CHIBIOS)/os/hal/src/hal_usbh.c \
+         $(CHIBIOS)/os/hal/src/usbh/hal_usbh_debug.c \
+         $(CHIBIOS)/os/hal/src/usbh/hal_usbh_desciter.c \
+         $(CHIBIOS)/os/hal/src/usbh/hal_usbh_hub.c \
+         $(CHIBIOS)/os/hal/src/usbh/hal_usbh_msd.c \
+         $(CHIBIOS)/os/hal/src/usbh/hal_usbh_ftdi.c \
+         $(CHIBIOS)/os/hal/src/usbh/hal_usbh_aoa.c \
+         $(CHIBIOS)/os/hal/src/usbh/hal_usbh_hid.c \
+         $(CHIBIOS)/os/hal/src/usbh/hal_usbh_uvc.c 
 endif
 
 ifneq ($(EXCLUDE_FLASH),yes)

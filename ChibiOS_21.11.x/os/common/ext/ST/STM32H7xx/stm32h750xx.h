@@ -2772,6 +2772,7 @@ typedef struct
 #define USB1_OTG_HS         ((USB_OTG_GlobalTypeDef *) USB1_OTG_HS_PERIPH_BASE)
 #define USB2_OTG_FS         ((USB_OTG_GlobalTypeDef *) USB2_OTG_FS_PERIPH_BASE)
 
+
 /* Legacy defines */
 #define USB_OTG_HS                   USB1_OTG_HS
 #define USB_OTG_HS_PERIPH_BASE       USB1_OTG_HS_PERIPH_BASE

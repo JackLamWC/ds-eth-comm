@@ -925,6 +925,7 @@ __STATIC_FORCEINLINE void port_wait_for_interrupt(void) {
 #if CORTEX_ENABLE_WFI_IDLE == TRUE
   __WFI();
 #endif
+
 }
 
 /**

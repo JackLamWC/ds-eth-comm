@@ -42,7 +42,6 @@
 
 #define BOARD_PHY_RMII
 #define BOARD_PHY_ID                MII_DP83848I_ID
-           
 
 /*
  * Board oscillators-related settings.
@@ -452,7 +451,7 @@
                                      PIN_MODE_ALTERNATE(GPIOA_RMII_CRX_DV) |  \
                                      PIN_MODE_INPUT(GPIOA_PIN8) |           \
                                      PIN_MODE_ANALOG(GPIOA_VBUS_FS2) |      \
-                                     PIN_MODE_ALTERNATE(GPIOA_USB_OTG_FS2_ID) |\
+                                     PIN_MODE_INPUT(GPIOA_USB_OTG_FS2_ID) |\
                                      PIN_MODE_ALTERNATE(GPIOA_OTG_FS_DM) |  \
                                      PIN_MODE_ALTERNATE(GPIOA_OTG_FS_DP) |  \
                                      PIN_MODE_ALTERNATE(GPIOA_SWDIO) |      \
@@ -532,7 +531,7 @@
                                      PIN_AFIO_AF(GPIOA_RMII_CRX_DV, 11U))
 #define VAL_GPIOA_AFRH              (PIN_AFIO_AF(GPIOA_PIN8, 0U) |          \
                                      PIN_AFIO_AF(GPIOA_VBUS_FS2, 0U) |      \
-                                     PIN_AFIO_AF(GPIOA_USB_OTG_FS2_ID, 10U) |\
+                                     PIN_AFIO_AF(GPIOA_USB_OTG_FS2_ID, 0U) |\
                                      PIN_AFIO_AF(GPIOA_OTG_FS_DM, 10U) |    \
                                      PIN_AFIO_AF(GPIOA_OTG_FS_DP, 10U) |    \
                                      PIN_AFIO_AF(GPIOA_SWDIO, 0U) |         \
