@@ -19,6 +19,9 @@
         "hid.h": "c",
         "segger_rtt.h": "c",
         "debug.h": "c",
-        "*.inc": "c"
+        "*.inc": "c",
+        "hal_st.h": "c",
+        "hal_spi.h": "c",
+        "hal_spi_v2.h": "c"
     }
 }

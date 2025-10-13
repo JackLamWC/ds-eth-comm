@@ -23,8 +23,17 @@
 #include "chprintf.h"
 #include "SEGGER_RTT_Channel.h"
 #include "SEGGER_RTT.h"
-#include "usbh/debug.h"	
+#include "usbh/debug.h"
+#include "w25qxx_interface.h"
 
+static w25qxx_handle_t w25qxx_handle;
+
+void w25qxx_interface_debug_print(const char *const fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  chvprintf((BaseSequentialStream *)&RTT_S0, fmt, ap);
+  va_end(ap);
+}
 
 /*
  * This is a periodic thread that does absolutely nothing except flashing
@@ -451,7 +460,7 @@ static THD_FUNCTION(UdpServerThread, arg) {
 #if JOY_STREAM_ENABLE
       char jout[512];
       int jn = chsnprintf(jout, sizeof(jout),
-        "{\"ts_ms\":%u,\"analogs\":[%u,%u,%u,%u,%u,%u],\"buttons_mask\":%u}",
+        "{\"timestamp_ms\":%u,\"axes\":[%u,%u,%u,%u,%u,%u],\"buttons\":%u}",
         joy->ts_ms, joy->lx, joy->ly, joy->rx, joy->ry, joy->l2, joy->r2, joy->buttons_mask);
       chprintf((BaseSequentialStream *)&RTT_S0, "JSON: %s\n", jout);
       sendto(sock, jout, (size_t)jn, 0, (struct sockaddr*)&bcast_addr, sizeof(bcast_addr));
@@ -475,6 +484,18 @@ void myLinkDownCallback(void *p) {
   chprintf((BaseSequentialStream *)&RTT_S0, "Ethernet disconnected!\n");
 }
 
+static const SPIConfig spi_config = {
+  .circular = false,
+  .ssline = LINE_SPI_FLASH_CS,
+  .slave = false,
+  .data_cb = NULL,
+  .error_cb = NULL,
+  .cfg1 = SPI_CFG1_MBR_2,  // Clock divider: 2^(2+1) = 8
+  .cfg2 = SPI_CFG2_CPHA | SPI_CFG2_CPOL  // Clock phase and polarity
+};
+
+
+
 /*
  * Application entry point.
  */
@@ -490,6 +511,35 @@ int main(void) {
   halInit();
   chSysInit();
   RTTchannelObjectInit(&RTT_S0);
+  
+  // Initialize SPI
+  spiStart(&SPID1, &spi_config);
+  
+  // Test SPI communication
+  static uint8_t tx[4] = {0x9F, 0x00, 0x00, 0x00};  // JEDEC ID command
+  static uint8_t rx[4] = {0x00, 0x00, 0x00, 0x00};
+  
+  chprintf((BaseSequentialStream *)&RTT_S0, "Testing SPI communication...\n");
+  
+  spiSelect(&SPID1);
+  msg_t res = spiExchange(&SPID1, 4, tx, rx);
+  spiUnselect(&SPID1);
+  
+  if (res == MSG_OK) {
+    chprintf((BaseSequentialStream *)&RTT_S0, "SPI Exchange OK\n");
+    chprintf((BaseSequentialStream *)&RTT_S0, "TX: 0x%02x 0x%02x 0x%02x 0x%02x\n", tx[0], tx[1], tx[2], tx[3]);
+    chprintf((BaseSequentialStream *)&RTT_S0, "RX: 0x%02x 0x%02x 0x%02x 0x%02x\n", rx[0], rx[1], rx[2], rx[3]);
+    
+    // Check if we got valid JEDEC ID response
+    if (rx[0] != 0x00 || rx[1] != 0x00 || rx[2] != 0x00) {
+      chprintf((BaseSequentialStream *)&RTT_S0, "Flash JEDEC ID: 0x%02x%02x%02x\n", rx[0], rx[1], rx[2]);
+    } else {
+      chprintf((BaseSequentialStream *)&RTT_S0, "No response from flash - check connections\n");
+    }
+  } else {
+    chprintf((BaseSequentialStream *)&RTT_S0, "SPI exchange failed: %d\n", res);
+  }
+  
 
   uint8_t mac_address[6] = {0x02, 0x12, 0x13, 0x10, 0x15, 0x05};
 

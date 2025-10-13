@@ -178,7 +178,7 @@ OSAL_IRQ_HANDLER(STM32_DMA1_CH0_HANDLER) {
  * @isr
  */
 OSAL_IRQ_HANDLER(STM32_DMA1_CH1_HANDLER) {
-  uint32_t flags;
+  volatile uint32_t flags;
 
   OSAL_IRQ_PROLOGUE();
 

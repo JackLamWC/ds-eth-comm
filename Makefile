@@ -122,6 +122,8 @@ CSRC = $(ALLCSRC) \
        ./src/RTT/SEGGER_RTT.c \
        ./src/RTT/SEGGER_RTT_printf.c \
        ./src/RTT/SEGGER_RTT_Channel.c \
+       ./src/w25qxx/w25qxx.c \
+       ./src/w25qxx/w25qxx_interface.c \
        main.c
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
@@ -135,7 +137,7 @@ ASMSRC = $(ALLASMSRC)
 ASMXSRC = $(ALLXASMSRC)
 
 # Inclusion directories.
-INCDIR = $(CONFDIR) $(BOARDDIR) $(ALLINC) ./src/RTT ./src
+INCDIR = $(CONFDIR) $(BOARDDIR) $(ALLINC) ./src/RTT ./src/w25qxx
 
 # Define C warning options here.
 CWARN = -Wall -Wextra -Wundef -Wstrict-prototypes
