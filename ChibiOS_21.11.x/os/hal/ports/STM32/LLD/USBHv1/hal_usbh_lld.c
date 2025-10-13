@@ -1422,7 +1422,11 @@ static void usb_lld_serve_interrupt(USBHDriver *host) {
 /*===========================================================================*/
 
 #if STM32_USBH_USE_OTG1
+#if defined(STM32H7XX)
+OSAL_IRQ_HANDLER(STM32_OTG2_HANDLER) {
+#else
 OSAL_IRQ_HANDLER(STM32_OTG1_HANDLER) {
+#endif
 	OSAL_IRQ_PROLOGUE();
 	osalSysLockFromISR();
 	usb_lld_serve_interrupt(&USBHD1);
@@ -1432,7 +1436,11 @@ OSAL_IRQ_HANDLER(STM32_OTG1_HANDLER) {
 #endif
 
 #if STM32_USBH_USE_OTG2
+#if defined(STM32H7XX)
+OSAL_IRQ_HANDLER(STM32_OTG1_HANDLER) {
+#else
 OSAL_IRQ_HANDLER(STM32_OTG2_HANDLER) {
+#endif
 	OSAL_IRQ_PROLOGUE();
 	osalSysLockFromISR();
 	usb_lld_serve_interrupt(&USBHD2);
@@ -1566,7 +1574,11 @@ void usbh_lld_start(USBHDriver *host) {
 		otgp->GINTMSK = 0;
 
 		/* Enables IRQ vector.*/
+#if defined(STM32H7XX)
+		nvicEnableVector(STM32_OTG2_NUMBER, STM32_USB_OTG1_IRQ_PRIORITY);
+#else
 		nvicEnableVector(STM32_OTG1_NUMBER, STM32_USB_OTG1_IRQ_PRIORITY);
+#endif
 	}
 #endif
 
@@ -1598,7 +1610,11 @@ void usbh_lld_start(USBHDriver *host) {
 		otgp->GINTMSK = 0;
 
 		/* Enables IRQ vector.*/
+#if defined(STM32H7XX)
+		nvicEnableVector(STM32_OTG1_NUMBER, STM32_USB_OTG2_IRQ_PRIORITY);
+#else
 		nvicEnableVector(STM32_OTG2_NUMBER, STM32_USB_OTG2_IRQ_PRIORITY);
+#endif
 	}
 #endif
 
@@ -1667,7 +1683,11 @@ void usbh_lld_stop(USBHDriver *host) {
 	if (&USBHD1 == host)
 	{
 		/* Disable IRQ vector.*/
+#if defined(STM32H7XX)
+		nvicDisableVector(STM32_OTG2_NUMBER);
+#else
 		nvicDisableVector(STM32_OTG1_NUMBER);
+#endif
 
 		/* OTG FS clock disable.*/
 		rccDisableOTG1();
@@ -1681,7 +1701,11 @@ void usbh_lld_stop(USBHDriver *host) {
 	if (&USBHD2 == host)
 	{
 		/* Enables IRQ vector.*/
+#if defined(STM32H7XX)
+		nvicDisableVector(STM32_OTG1_NUMBER);
+#else
 		nvicDisableVector(STM32_OTG2_NUMBER);
+#endif
 
 		/* OTG HS clock disable.*/
 		rccDisableOTG2(); // Disable HS clock when cpu is in sleep mode

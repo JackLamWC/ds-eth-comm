@@ -478,7 +478,7 @@
  * USB driver system settings.
  */
 #define STM32_USB_USE_OTG1                  FALSE
-#define STM32_USB_USE_OTG2                  TRUE
+#define STM32_USB_USE_OTG2                  FALSE
 #define STM32_USB_OTG1_IRQ_PRIORITY         14
 #define STM32_USB_OTG2_IRQ_PRIORITY         14
 #define STM32_USB_OTG1_RX_FIFO_SIZE         512
@@ -553,7 +553,7 @@
 
 /* HID */
 #define HAL_USBH_USE_HID                              TRUE
-#define HAL_USBHHID_MAX_INSTANCES                     2
+#define HAL_USBHHID_MAX_INSTANCES                     1
 #define HAL_USBHHID_USE_INTERRUPT_OUT                 FALSE
 
 /* HUB */
@@ -569,7 +569,6 @@
 #define USBH_DEBUG_MULTI_HOST                         FALSE
 #define USBH_DEBUG_SINGLE_HOST_SELECTION			  USBHD2
 #define USBH_DEBUG_BUFFER                             2500
-#define USBH_DEBUG_OUTPUT_CALLBACK                    usbh_debug_output
 
 #define USBH_DEBUG_ENABLE_TRACE                       FALSE
 #define USBH_DEBUG_ENABLE_INFO                        TRUE

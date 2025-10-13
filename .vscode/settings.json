@@ -16,6 +16,9 @@
         "usbh_lld.h": "c",
         "cmsis_os.h": "c",
         "stm32h750xx.h": "c",
-        "hid.h": "c"
+        "hid.h": "c",
+        "segger_rtt.h": "c",
+        "debug.h": "c",
+        "*.inc": "c"
     }
 }

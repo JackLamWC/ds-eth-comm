@@ -22,6 +22,8 @@
 #include "lwip/netif.h"
 #include "chprintf.h"
 #include "SEGGER_RTT_Channel.h"
+#include "SEGGER_RTT.h"
+#include "usbh/debug.h"	
 
 
 /*
@@ -40,10 +42,350 @@ static THD_FUNCTION(Thread1, arg) {
   }
 }
 
+#if HAL_USBH_USE_HID
+#include "usbh/dev/hid.h"
+#include "chprintf.h"
+
+// PlayStation Controller HID Report Structure
+typedef struct {
+    // Report ID (always 0x01)
+    uint8_t report_id;
+    
+    // Analog sticks (0x00-0xFF, neutral ~0x80)
+    uint8_t left_stick_x;    // Left stick X axis
+    uint8_t left_stick_y;    // Left stick Y axis  
+    uint8_t right_stick_x;   // Right stick X axis
+    uint8_t right_stick_y;   // Right stick Y axis
+    
+    // Triggers (0x00-0xFF, neutral 0x00)
+    uint8_t l2_trigger;      // L2 trigger axis
+    uint8_t r2_trigger;      // R2 trigger axis
+    
+    // Vendor data
+    uint8_t vendor_data1;
+    
+    // D-pad (4 bits) + Face buttons (4 bits)
+    union {
+        uint8_t raw;
+        struct {
+            uint8_t dpad : 4;        // D-pad direction
+            uint8_t face_buttons : 4; // Square, Cross, Circle, Triangle
+        };
+    } dpad_face;
+    
+    // Shoulder and system buttons
+    union {
+        uint8_t raw;
+        struct {
+            uint8_t l1 : 1;      // L1 button
+            uint8_t r1 : 1;       // R1 button
+            uint8_t l2 : 1;       // L2 button
+            uint8_t r2 : 1;       // R2 button
+            uint8_t create : 1;   // Create button
+            uint8_t options : 1;  // Options button
+            uint8_t l3 : 1;       // L3 button
+            uint8_t r3 : 1;       // R3 button
+        };
+    } shoulder_buttons;
+    
+    // System buttons and vendor data
+    union {
+        uint8_t raw;
+        struct {
+            uint8_t ps_button : 1;    // PS button
+            uint8_t touchpad : 1;     // Touchpad button
+            uint8_t mute : 1;         // Mute button
+            uint8_t vendor_bits : 5;  // Vendor defined bits
+        };
+    } system_buttons;
+    
+    // Additional vendor data (52 bytes)
+    uint8_t vendor_data[52];
+    
+} ps_controller_report_t;
+
+// D-pad direction constants
+typedef enum {
+    DPAD_NEUTRAL = 0x8,
+    DPAD_NORTH = 0x0,
+    DPAD_NORTHEAST = 0x1,
+    DPAD_EAST = 0x2,
+    DPAD_SOUTHEAST = 0x3,
+    DPAD_SOUTH = 0x4,
+    DPAD_SOUTHWEST = 0x5,
+    DPAD_WEST = 0x6,
+    DPAD_NORTHWEST = 0x7
+} dpad_direction_t;
+
+// Face button constants
+typedef enum {
+    FACE_SQUARE = 0x01,
+    FACE_CROSS = 0x02,
+    FACE_CIRCLE = 0x04,
+    FACE_TRIANGLE = 0x08
+} face_button_t;
+
+typedef enum {
+    PAD_DPAD_NEUTRAL = 0,
+    PAD_DPAD_NORTH   = 1,
+    PAD_DPAD_EAST    = 2,
+    PAD_DPAD_SOUTH   = 3,
+    PAD_DPAD_WEST    = 4,
+} pad_dpad_dir_t;
+
+typedef struct {
+    uint32_t ts_ms;   /* timestamp in milliseconds */
+    uint8_t lx, ly;   /* 0..255 */
+    uint8_t rx, ry;   /* 0..255 */
+    uint8_t l2, r2;   /* 0..255 */
+    pad_dpad_dir_t dpad;
+    /* Digital buttons */
+    uint8_t square, cross, circle, triangle;
+    uint8_t l1, r1, l2_btn, r2_btn;
+    uint8_t l3, r3;
+    uint8_t create, options;
+    uint8_t ps, touchpad, mute;
+    uint32_t buttons_mask; /* compressed bitmask incl. dpad U/R/D/L */
+} pad_state_t;
+
+/* Inter-thread communication: pad_state_t mailbox over a memory pool */
+#define JOY_POOL_SIZE     8
+#define JOY_MB_CAPACITY   8
+
+static memory_pool_t joyPool;
+static pad_state_t joyPoolBuf[JOY_POOL_SIZE];
+static mailbox_t joyMB;
+static msg_t joyMBSlots[JOY_MB_CAPACITY];
+static pad_state_t lastJoy;
+static mutex_t joyMtx;
+
+
+static inline float _norm_stick_u8(uint8_t v) {
+    return ((float)((int)v - 128)) / 127.0f; /* ~[-1..1] */
+}
+
+static inline float _norm_trigger_u8(uint8_t v) {
+    return (2.0f * ((float)v / 255.0f)) - 1.0f; /* [-1..1], released=+1, pressed=-1 */
+}
+
+/* Map HID hat to ROS-style D-pad axes: left=+1, right=-1, up=+1, down=-1, neutral=0 */
+static inline void _map_hat_to_axes(uint8_t hat, float *lr, float *ud) {
+    float x = 0.0f, y = 0.0f;
+    switch (hat) {
+        case 0x0: y = +1.0f; break;                 /* N */
+        case 0x1: y = +1.0f; x = -1.0f; break;      /* NE (right -> -1) */
+        case 0x2: x = -1.0f; break;                 /* E (right -> -1) */
+        case 0x3: y = -1.0f; x = -1.0f; break;      /* SE */
+        case 0x4: y = -1.0f; break;                 /* S */
+        case 0x5: y = -1.0f; x = +1.0f; break;      /* SW (left -> +1) */
+        case 0x6: x = +1.0f; break;                 /* W (left -> +1) */
+        case 0x7: y = +1.0f; x = +1.0f; break;      /* NW */
+        default: /* 0x8 neutral */ break;
+    }
+    *lr = x;  /* axes[6] */
+    *ud = y;  /* axes[7] */
+}
+
+static inline pad_dpad_dir_t hat_to_cardinal(uint8_t hat) {
+    switch (hat) { /* 0=N,1=NE,2=E,3=SE,4=S,5=SW,6=W,7=NW,8=neutral */
+        case 0: return PAD_DPAD_NORTH;
+        case 1: return PAD_DPAD_NORTH; /* NE -> N */
+        case 2: return PAD_DPAD_EAST;
+        case 3: return PAD_DPAD_SOUTH; /* SE -> S */
+        case 4: return PAD_DPAD_SOUTH;
+        case 5: return PAD_DPAD_SOUTH; /* SW -> S */
+        case 6: return PAD_DPAD_WEST;
+        case 7: return PAD_DPAD_NORTH; /* NW -> N */
+        default: return PAD_DPAD_NEUTRAL;
+    }
+}
+
+static inline void ros_joy_dpad_bools_hat(uint8_t hat, int *btn_up, int *btn_down, int *btn_left, int *btn_right) {
+  /* hat values: 0=N,1=NE,2=E,3=SE,4=S,5=SW,6=W,7=NW,8=neutral */
+  *btn_up = (hat == 0 || hat == 1 || hat == 7) ? 1 : 0;
+  *btn_right = (hat == 1 || hat == 2 || hat == 3) ? 1 : 0;
+  *btn_down = (hat == 3 || hat == 4 || hat == 5) ? 1 : 0;
+  *btn_left = (hat == 5 || hat == 6 || hat == 7) ? 1 : 0;
+}
+
+static inline void ps_to_pad_state(const ps_controller_report_t *r, pad_state_t *out) {
+    out->ts_ms = TIME_I2MS(chVTGetSystemTimeX());
+    out->lx = r->left_stick_x;
+    out->ly = r->left_stick_y;
+    out->rx = r->right_stick_x;
+    out->ry = r->right_stick_y;
+    out->l2 = r->l2_trigger;
+    out->r2 = r->r2_trigger;
+    out->dpad = hat_to_cardinal((uint8_t)r->dpad_face.dpad);
+    out->square   = (r->dpad_face.face_buttons & FACE_SQUARE)   ? 1 : 0;
+    out->cross    = (r->dpad_face.face_buttons & FACE_CROSS)    ? 1 : 0;
+    out->circle   = (r->dpad_face.face_buttons & FACE_CIRCLE)   ? 1 : 0;
+    out->triangle = (r->dpad_face.face_buttons & FACE_TRIANGLE) ? 1 : 0;
+    out->l1 = r->shoulder_buttons.l1 ? 1 : 0;
+    out->r1 = r->shoulder_buttons.r1 ? 1 : 0;
+    out->l2_btn = r->shoulder_buttons.l2 ? 1 : 0;
+    out->r2_btn = r->shoulder_buttons.r2 ? 1 : 0;
+    out->l3 = r->shoulder_buttons.l3 ? 1 : 0;
+    out->r3 = r->shoulder_buttons.r3 ? 1 : 0;
+    out->create  = r->shoulder_buttons.create  ? 1 : 0;
+    out->options = r->shoulder_buttons.options ? 1 : 0;
+    out->ps       = r->system_buttons.ps_button ? 1 : 0;
+    out->touchpad = r->system_buttons.touchpad  ? 1 : 0;
+    out->mute     = r->system_buttons.mute      ? 1 : 0;
+
+    /* Build compressed buttons mask */
+    uint32_t m = 0;
+#define SETB(bit, val) do { if (val) m |= (1u << (bit)); } while (0)
+    /* 0..14 regular buttons */
+    SETB(0, out->square);
+    SETB(1, out->cross);
+    SETB(2, out->circle);
+    SETB(3, out->triangle);
+    SETB(4, out->l1);
+    SETB(5, out->r1);
+    SETB(6, out->l2_btn);
+    SETB(7, out->r2_btn);
+    SETB(8, out->l3);
+    SETB(9, out->r3);
+    SETB(10, out->create);
+    SETB(11, out->options);
+    SETB(12, out->ps);
+    SETB(13, out->touchpad);
+    SETB(14, out->mute);
+    /* 15..18 D-pad U/R/D/L from hat */
+    int u=0,d=0,l=0,rgt=0;
+    ros_joy_dpad_bools_hat((uint8_t)r->dpad_face.dpad, &u, &d, &l, &rgt);
+    SETB(15, u);
+    SETB(16, rgt);
+    SETB(17, d);
+    SETB(18, l);
+#undef SETB
+    out->buttons_mask = m;
+}
+
+static inline const char *pad_dpad_str(pad_dpad_dir_t d) {
+    switch (d) {
+        case PAD_DPAD_NORTH: return "N";
+        case PAD_DPAD_EAST:  return "E";
+        case PAD_DPAD_SOUTH: return "S";
+        case PAD_DPAD_WEST:  return "W";
+        default:             return "NEUTRAL";
+    }
+}
+
+
+static THD_WORKING_AREA(waTestHID, 1024);
+
+static void _hid_report_callback(USBHHIDDriver *hidp, uint16_t len) {
+    uint8_t *report = (uint8_t *)hidp->config->report_buffer;
+
+    if (hidp->type == USBHHID_DEVTYPE_BOOT_MOUSE) {
+        chprintf((BaseSequentialStream *)&RTT_S0, "Mouse report: buttons=%02x, Dx=%d, Dy=%d\n",
+                report[0],
+                (int8_t)report[1],
+                (int8_t)report[2]);
+    } else if (hidp->type == USBHHID_DEVTYPE_BOOT_KEYBOARD) {
+        // chprintf((BaseSequentialStream *)&RTT_S0, "Keyboard report: modifier=%02x, keys=%02x %02x %02x %02x %02x %02x\n",
+        //         report[0],
+        //         report[2],
+        //         report[3],
+        //         report[4],
+        //         report[5],
+        //         report[6],
+        //         report[7]);
+    } else {
+        // Check if this is a PlayStation controller report
+        if (len >= sizeof(ps_controller_report_t) && report[0] == 0x01) {
+            // Cast the raw data to our struct
+            ps_controller_report_t *controller = (ps_controller_report_t *)report;
+            
+            // Parse analog sticks (convert to signed values)
+            int16_t left_x = (int16_t)controller->left_stick_x - 128;
+            int16_t left_y = (int16_t)controller->left_stick_y - 128;
+            int16_t right_x = (int16_t)controller->right_stick_x - 128;
+            int16_t right_y = (int16_t)controller->right_stick_y - 128;
+            
+            // Parse D-pad
+            dpad_direction_t dpad = (dpad_direction_t)controller->dpad_face.dpad;
+            
+            // Parse face buttons
+            bool square = (controller->dpad_face.face_buttons & FACE_SQUARE) != 0;
+            bool cross = (controller->dpad_face.face_buttons & FACE_CROSS) != 0;
+            bool circle = (controller->dpad_face.face_buttons & FACE_CIRCLE) != 0;
+            bool triangle = (controller->dpad_face.face_buttons & FACE_TRIANGLE) != 0;
+            
+            // Build ROS-like joy output
+            pad_state_t *joy = (pad_state_t *)chPoolAlloc(&joyPool);
+            if (joy == NULL) {
+                // Pool exhausted, drop this frame
+                return;
+            }
+            ps_to_pad_state(controller, joy);
+
+            // Post to mailbox (try, drop if full)
+            (void)chMBPostTimeout(&joyMB, (msg_t)joy, TIME_IMMEDIATE);
+        } else {
+            // Handle other generic HID devices
+            chprintf((BaseSequentialStream *)&RTT_S0, "Generic HID report, %d bytes\n", len);
+            chprintf((BaseSequentialStream *)&RTT_S0, "Report: ");
+            for (int i = 0; i < (len < 16 ? len : 16); i++) {
+                chprintf((BaseSequentialStream *)&RTT_S0, "%02x ", report[i]);
+            }
+            chprintf((BaseSequentialStream *)&RTT_S0, "\n");
+        }
+    }
+}
+
+static USBH_DEFINE_BUFFER(uint8_t report[HAL_USBHHID_MAX_INSTANCES][64]);
+static USBHHIDConfig hidcfg[HAL_USBHHID_MAX_INSTANCES];
+
+static void ThreadTestHID(void *p) {
+  (void)p;
+  uint8_t i;
+  static uint8_t kbd_led_states[HAL_USBHHID_MAX_INSTANCES];
+
+  chRegSetThreadName("HID");
+
+  for (i = 0; i < HAL_USBHHID_MAX_INSTANCES; i++) {
+      hidcfg[i].cb_report = _hid_report_callback;
+      hidcfg[i].protocol = USBHHID_PROTOCOL_REPORT;
+      hidcfg[i].report_buffer = report[i];
+      hidcfg[i].report_len = 64;
+  }
+
+  chprintf((BaseSequentialStream *)&RTT_S0, "HID Thread started\n");  // Add this
+
+  for (;;) {
+      for (i = 0; i < HAL_USBHHID_MAX_INSTANCES; i++) {
+          USBHHIDDriver *const hidp = &USBHHIDD[i];
+          usbhhid_state_t state = usbhhidGetState(hidp);
+      
+          
+          if (state == USBHHID_STATE_ACTIVE) {
+            
+              chprintf((BaseSequentialStream *)&RTT_S0, "HID: Connected, HID%d\n", i);
+              usbhhidStart(hidp, &hidcfg[i]);
+              if (usbhhidGetType(hidp) != USBHHID_DEVTYPE_GENERIC) {
+                  usbhhidSetIdle(hidp, 0, 0);
+              }
+              kbd_led_states[i] = 1;
+          } else if (state == USBHHID_STATE_READY) {
+              // ... rest of your code
+          }
+      }
+      chThdSleepMilliseconds(500);
+  }
+}
+#endif
+
+
 
 // UDP Server Configuration
 #define UDP_SERVER_PORT    12345
 #define UDP_BUFFER_SIZE    1024
+// Optional JSON streaming (broadcast) so clients can just listen
+#define JOY_STREAM_ENABLE  1
+#define JOY_STREAM_PORT    12346
 
 /*
  * UDP Server Thread
@@ -55,6 +397,7 @@ static THD_FUNCTION(UdpServerThread, arg) {
   
   int sock;
   struct sockaddr_in server_addr, client_addr;
+  struct sockaddr_in bcast_addr;
   socklen_t client_len = sizeof(client_addr);
   uint8_t buffer[UDP_BUFFER_SIZE];
   int bytes_received;
@@ -71,6 +414,14 @@ static THD_FUNCTION(UdpServerThread, arg) {
   server_addr.sin_family = AF_INET;
   server_addr.sin_addr.s_addr = INADDR_ANY;  // Listen on all interfaces
   server_addr.sin_port = htons(UDP_SERVER_PORT);
+
+#if JOY_STREAM_ENABLE
+  // Configure broadcast destination address
+  memset(&bcast_addr, 0, sizeof(bcast_addr));
+  bcast_addr.sin_family = AF_INET;
+  bcast_addr.sin_addr.s_addr = INADDR_BROADCAST; // 255.255.255.255
+  bcast_addr.sin_port = htons(JOY_STREAM_PORT);
+#endif
   
   // Bind socket to address
   if (bind(sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
@@ -78,30 +429,35 @@ static THD_FUNCTION(UdpServerThread, arg) {
     close(sock);
     return;
   }
+
+#if JOY_STREAM_ENABLE
+  // Enable broadcast on this socket
+  {
+    int opt = 1;
+    (void)setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &opt, sizeof(opt));
+  }
+#endif
   
   chprintf((BaseSequentialStream *)&RTT_S0, "UDP Server started on port %d\n", UDP_SERVER_PORT);
   
   while (true) {
-    // Wait for incoming data
-    bytes_received = recvfrom(sock, buffer, UDP_BUFFER_SIZE - 1, 0, 
-                             (struct sockaddr*)&client_addr, &client_len);
-    
-    if (bytes_received > 0) {
-      buffer[bytes_received] = '\0';  // Null-terminate the string
-      
-      // Print received data and client info
-      chprintf((BaseSequentialStream *)&RTT_S0, 
-               "Received from %d.%d.%d.%d:%d: %s\n",
-               (client_addr.sin_addr.s_addr >> 0) & 0xFF,
-               (client_addr.sin_addr.s_addr >> 8) & 0xFF,
-               (client_addr.sin_addr.s_addr >> 16) & 0xFF,
-               (client_addr.sin_addr.s_addr >> 24) & 0xFF,
-               ntohs(client_addr.sin_port),
-               buffer);
-    }
-    else if (bytes_received < 0) {
-      chprintf((BaseSequentialStream *)&RTT_S0, "Error receiving UDP data\n");
-      chThdSleepMilliseconds(100);
+    // Non-blocking HID->UDP forwarding: poll mailbox with timeout
+    msg_t m;
+    msg_t mbres = chMBFetchTimeout(&joyMB, &m, TIME_MS2I(50));
+
+    if (mbres == MSG_OK) {
+      pad_state_t *joy = (pad_state_t *)m;
+      // Optionally broadcast JSON snapshot for listeners
+#if JOY_STREAM_ENABLE
+      char jout[512];
+      int jn = chsnprintf(jout, sizeof(jout),
+        "{\"ts_ms\":%u,\"analogs\":[%u,%u,%u,%u,%u,%u],\"buttons_mask\":%u}",
+        joy->ts_ms, joy->lx, joy->ly, joy->rx, joy->ry, joy->l2, joy->r2, joy->buttons_mask);
+      chprintf((BaseSequentialStream *)&RTT_S0, "JSON: %s\n", jout);
+      sendto(sock, jout, (size_t)jn, 0, (struct sockaddr*)&bcast_addr, sizeof(bcast_addr));
+#endif
+      // Return buffer to pool
+      chPoolFree(&joyPool, joy);
     }
   }
 }
@@ -119,82 +475,6 @@ void myLinkDownCallback(void *p) {
   chprintf((BaseSequentialStream *)&RTT_S0, "Ethernet disconnected!\n");
 }
 
-#if HAL_USBH_USE_HID
-#include "usbh/dev/hid.h"
-#include "chprintf.h"
-
-static THD_WORKING_AREA(waTestHID, 1024);
-
-static void _hid_report_callback(USBHHIDDriver *hidp, uint16_t len) {
-    uint8_t *report = (uint8_t *)hidp->config->report_buffer;
-
-    if (hidp->type == USBHHID_DEVTYPE_BOOT_MOUSE) {
-        chprintf((BaseSequentialStream *)&RTT_S0, "Mouse report: buttons=%02x, Dx=%d, Dy=%d\n",
-                report[0],
-                (int8_t)report[1],
-                (int8_t)report[2]);
-    } else if (hidp->type == USBHHID_DEVTYPE_BOOT_KEYBOARD) {
-        chprintf((BaseSequentialStream *)&RTT_S0, "Keyboard report: modifier=%02x, keys=%02x %02x %02x %02x %02x %02x\n",
-                report[0],
-                report[2],
-                report[3],
-                report[4],
-                report[5],
-                report[6],
-                report[7]);
-    } else {
-        chprintf((BaseSequentialStream *)&RTT_S0, "Generic report, %d bytes\n", len);
-    }
-}
-
-static USBH_DEFINE_BUFFER(uint8_t report[HAL_USBHHID_MAX_INSTANCES][8]);
-static USBHHIDConfig hidcfg[HAL_USBHHID_MAX_INSTANCES];
-
-static void ThreadTestHID(void *p) {
-  (void)p;
-  uint8_t i;
-  static uint8_t kbd_led_states[HAL_USBHHID_MAX_INSTANCES];
-
-  chRegSetThreadName("HID");
-
-  for (i = 0; i < HAL_USBHHID_MAX_INSTANCES; i++) {
-      hidcfg[i].cb_report = _hid_report_callback;
-      hidcfg[i].protocol = USBHHID_PROTOCOL_REPORT;
-      hidcfg[i].report_buffer = report[i];
-      hidcfg[i].report_len = 8;
-  }
-
-  chprintf((BaseSequentialStream *)&RTT_S0, "HID Thread started\n");  // Add this
-
-  for (;;) {
-      for (i = 0; i < HAL_USBHHID_MAX_INSTANCES; i++) {
-          USBHHIDDriver *const hidp = &USBHHIDD[i];
-          usbhhid_state_t state = usbhhidGetState(hidp);
-          
-          // Add debug output
-          if (state != USBHHID_STATE_STOP) {
-              chprintf((BaseSequentialStream *)&RTT_S0, "HID%d: state=%d, type=%d\n", 
-                      i, state, usbhhidGetType(hidp));
-          }
-          
-          if (state == USBHHID_STATE_ACTIVE) {
-              chprintf((BaseSequentialStream *)&RTT_S0, "HID: Connected, HID%d\n", i);
-              usbhhidStart(hidp, &hidcfg[i]);
-              if (usbhhidGetType(hidp) != USBHHID_DEVTYPE_GENERIC) {
-                  usbhhidSetIdle(hidp, 0, 0);
-              }
-              kbd_led_states[i] = 1;
-          } else if (state == USBHHID_STATE_READY) {
-              // ... rest of your code
-          }
-      }
-      chThdSleepMilliseconds(200);
-  }
-}
-#endif
-
-
-
 /*
  * Application entry point.
  */
@@ -206,9 +486,9 @@ int main(void) {
    * - Kernel initialization, the main() function becomes a thread and the
    *   RTOS is active.
    */
+
   halInit();
   chSysInit();
-  usbhInit();
   RTTchannelObjectInit(&RTT_S0);
 
   uint8_t mac_address[6] = {0x02, 0x12, 0x13, 0x10, 0x15, 0x05};
@@ -234,6 +514,12 @@ int main(void) {
   /*
    * Creates the example threads.
    */
+  /* Initialize pad_state_t pool and mailbox */
+  chPoolObjectInit(&joyPool, sizeof(pad_state_t), NULL);
+  chPoolLoadArray(&joyPool, joyPoolBuf, JOY_POOL_SIZE);
+  chMBObjectInit(&joyMB, joyMBSlots, JOY_MB_CAPACITY);
+  chMtxObjectInit(&joyMtx);
+
   chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO+1, Thread1, NULL);
   chThdCreateStatic(waUdpServer, sizeof(waUdpServer), NORMALPRIO, UdpServerThread, NULL);
   chThdCreateStatic(waTestHID, sizeof(waTestHID), NORMALPRIO, ThreadTestHID, NULL);
@@ -244,7 +530,7 @@ int main(void) {
   #endif
   #if STM32_USBH_USE_OTG2
       usbhStart(&USBHD2);
-      chprintf((BaseSequentialStream *)&RTT_S0, "USBH OTG2 start requested\n");
+      chprintf((BaseSequentialStream *)&RTT_S0, "USBH OTG2 started");
   #endif
 
   while (1) {
@@ -254,12 +540,6 @@ int main(void) {
     #if STM32_USBH_USE_OTG1
       usbhMainLoop(&USBHD1);
     #endif
-    #if STM32_USBH_USE_OTG2
-      uint32_t isHostMode = &USBHD2.otg->GINTSTS;
-    #endif
-    #if STM32_USBH_USE_OTG1
-      uint32_t status = &USBHD1.rootport.c_status;
-    #endif
-    chThdSleepMilliseconds(500);
+    chThdSleepMilliseconds(1000);
   }
 }
