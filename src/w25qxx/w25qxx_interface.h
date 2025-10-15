@@ -37,9 +37,15 @@
  #ifndef DRIVER_W25QXX_INTERFACE_H
  #define DRIVER_W25QXX_INTERFACE_H
  
- #include "w25qxx.h"
- #include "ch.h"
- #include "hal.h"
+#include "w25qxx.h"
+#include "ch.h"
+#include "hal.h"
+#include <stdint.h>
+#include <stdbool.h>
+#include <stdarg.h>
+
+// Cache management includes for STM32H7
+#include "core_cm7.h"
  
  #ifdef __cplusplus
  extern "C"{
@@ -111,15 +117,30 @@
   */
  void w25qxx_interface_delay_us(uint32_t us);
  
- /**
-  * @brief     interface print format data
-  * @param[in] fmt format data
-  * @note      none
-  */
- void w25qxx_interface_debug_print(const char *const fmt, ...);
- /**
-  * @}
-  */
+/**
+ * @brief     interface print format data
+ * @param[in] fmt format data
+ * @note      none
+ */
+void w25qxx_interface_debug_print(const char *const fmt, ...);
+
+/**
+ * @brief     Cache management helper functions for STM32H7 DMA operations
+ * @note      These functions ensure cache coherency for DMA transfers
+ */
+void w25qxx_cache_clean_dcache_by_addr(void *addr, int32_t dsize);
+void w25qxx_cache_invalidate_dcache_by_addr(void *addr, int32_t dsize);
+void w25qxx_cache_clean_invalidate_dcache_by_addr(void *addr, int32_t dsize);
+
+/**
+ * @brief     Test function to verify cache management is working
+ * @note      This function can be called to test W25QXX operations with cache management
+ */
+void w25qxx_test_cache_management(void);
+
+/**
+ * @}
+ */
  
  #ifdef __cplusplus
  }

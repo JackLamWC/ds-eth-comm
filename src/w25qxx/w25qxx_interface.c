@@ -34,14 +34,24 @@
  * </table>
  */
 
- #include "w25qxx_interface.h"
+#include "w25qxx_interface.h"
+#include <string.h>
+#include "core_cm7.h"  // For cache management functions
 
- static SPIConfig spi_config = {
-    .circular = false,
-    .ssline = LINE_SPI_FLASH_CS,
-    .slave = false,
-    .data_cb = NULL,
-    .error_cb = NULL,
+// Static buffers for DMA-compatible SPI communication
+// DMA requires memory to be in a specific region accessible to the DMA controller
+// Buffer size chosen to accommodate w25qxx operations (SFDP, security registers use 256 bytes)
+#define SPI_BUFFER_SIZE 512
+
+
+static const SPIConfig spi_config = {
+   .circular = false,
+   .ssline = LINE_SPI_FLASH_CS,
+   .slave = false,
+   .data_cb = NULL,
+   .error_cb = NULL,
+   .cfg1 = SPI_CFG1_MBR_1 | SPI_CFG1_MBR_2 | SPI_CFG1_DSIZE_8BITS,
+   .cfg2 = SPI_CFG2_CPHA | SPI_CFG2_CPOL
  };
 
  /**
@@ -101,9 +111,28 @@ uint8_t w25qxx_interface_spi_qspi_write_read(uint8_t instruction, uint8_t instru
                                              uint8_t dummy, uint8_t *in_buf, uint32_t in_len,
                                              uint8_t *out_buf, uint32_t out_len, uint8_t data_line)
 {
-    msg_t msg;
-    
-    return 0;
+   static uint8_t spi_tx_buffer[SPI_BUFFER_SIZE];
+   static uint8_t spi_rx_buffer[SPI_BUFFER_SIZE];
+   msg_t msg;
+   uint32_t total_len = in_len + out_len;
+   
+   // Copy input data
+   memcpy(spi_tx_buffer, in_buf, in_len);
+
+   // Cache management for DMA coherency
+   SCB_CleanDCache_by_Addr((uint32_t *)spi_tx_buffer, total_len);  // Ensure DMA sees CPU data
+   SCB_InvalidateDCache_by_Addr((uint32_t *)spi_rx_buffer, total_len);  // Ensure CPU sees DMA data
+
+   spiSelect(&SPID1);
+   
+   spiExchange(&SPID1, total_len, spi_tx_buffer, spi_rx_buffer);
+   
+   // Ensure received data is visible to CPU
+   SCB_CleanInvalidateDCache_by_Addr((uint32_t *)spi_rx_buffer, total_len);
+   
+   memcpy(out_buf, spi_rx_buffer + in_len, out_len);
+   spiUnselect(&SPID1);
+   return 0;
 }
  
  /**
