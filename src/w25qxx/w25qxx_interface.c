@@ -116,13 +116,29 @@ uint8_t w25qxx_interface_spi_qspi_write_read(uint8_t instruction, uint8_t instru
    msg_t msg;
    uint32_t total_len = in_len + out_len;
    
-   // Copy input data
-   memcpy(spi_tx_buffer, in_buf, in_len);
+   // Null pointer checks
+   if (in_buf == NULL && in_len > 0) {
+       return 1;  // Error: input buffer is NULL but input length > 0
+   }
+   if (out_buf == NULL && out_len > 0) {
+       return 1;  // Error: output buffer is NULL but output length > 0
+   }
+   
+   // Buffer size validation
+   if (total_len > SPI_BUFFER_SIZE) {
+       return 1;  // Error: total transfer size exceeds buffer capacity
+   }
+   
+   // Copy input data only if input buffer is valid and length > 0
+   if (in_buf != NULL && in_len > 0) {
+       memcpy(spi_tx_buffer, in_buf, in_len);
+   }
 
    // Cache management for DMA coherency
    SCB_CleanDCache_by_Addr((uint32_t *)spi_tx_buffer, total_len);  // Ensure DMA sees CPU data
    SCB_InvalidateDCache_by_Addr((uint32_t *)spi_rx_buffer, total_len);  // Ensure CPU sees DMA data
 
+   spiAcquireBus(&SPID1);
    spiSelect(&SPID1);
    
    spiExchange(&SPID1, total_len, spi_tx_buffer, spi_rx_buffer);
@@ -130,8 +146,13 @@ uint8_t w25qxx_interface_spi_qspi_write_read(uint8_t instruction, uint8_t instru
    // Ensure received data is visible to CPU
    SCB_CleanInvalidateDCache_by_Addr((uint32_t *)spi_rx_buffer, total_len);
    
-   memcpy(out_buf, spi_rx_buffer + in_len, out_len);
+   // Copy output data only if output buffer is valid and length > 0
+   if (out_buf != NULL && out_len > 0) {
+       memcpy(out_buf, spi_rx_buffer + in_len, out_len);
+   }
+   
    spiUnselect(&SPID1);
+   spiReleaseBus(&SPID1);
    return 0;
 }
  

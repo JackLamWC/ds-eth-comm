@@ -25,6 +25,10 @@
 #include "SEGGER_RTT.h"
 #include "usbh/debug.h"
 #include "w25qxx_interface.h"
+#include "shell.h"
+#include "nrf24l01.h"
+#include "nrf24l01_interface.h"
+#include "nrf24l01_basic.h"
 
 static w25qxx_handle_t w25qxx_handle;
 
@@ -34,6 +38,14 @@ void w25qxx_interface_debug_print(const char *const fmt, ...) {
   chvprintf((BaseSequentialStream *)&RTT_S0, fmt, ap);
   va_end(ap);
 }
+
+void nrf24l01_interface_debug_print(const char *const fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  chvprintf((BaseSequentialStream *)&RTT_S0, fmt, ap);
+  va_end(ap);
+}
+
 
 /*
  * This is a periodic thread that does absolutely nothing except flashing
@@ -284,6 +296,7 @@ static inline const char *pad_dpad_str(pad_dpad_dir_t d) {
 
 
 static THD_WORKING_AREA(waTestHID, 1024);
+static THD_WORKING_AREA(waUsbHost, 512);
 
 static void _hid_report_callback(USBHHIDDriver *hidp, uint16_t len) {
     uint8_t *report = (uint8_t *)hidp->config->report_buffer;
@@ -383,6 +396,27 @@ static void ThreadTestHID(void *p) {
           }
       }
       chThdSleepMilliseconds(500);
+  }
+}
+
+/*
+ * USB Host Thread
+ * Dedicated thread for USB host operations with high-frequency polling
+ */
+static THD_FUNCTION(UsbHostThread, arg) {
+  (void)arg;
+  chRegSetThreadName("usb_host");
+  
+  chprintf((BaseSequentialStream *)&RTT_S0, "USB Host Thread started\n");
+  
+  while (true) {
+    #if STM32_USBH_USE_OTG2
+      usbhMainLoop(&USBHD2);
+    #endif
+    #if STM32_USBH_USE_OTG1
+      usbhMainLoop(&USBHD1);
+    #endif
+    chThdSleepMilliseconds(10);  // 10ms polling for USB events
   }
 }
 #endif
@@ -502,6 +536,64 @@ static const SPIConfig spi_config = {
 
 static w25qxx_handle_t w25qxx_handle;
 
+char shell_history[SHELL_MAX_HIST_BUFF];
+char *shell_completions[SHELL_MAX_COMPLETIONS];
+
+#define SHELL_WA_SIZE THD_WORKING_AREA_SIZE(1024)
+
+static const ShellCommand commands[] = {
+    {NULL, NULL}
+};
+
+static const ShellConfig shell_cfg1 = {
+    (BaseSequentialStream *)&RTT_S0,
+    commands,
+    shell_history,
+    sizeof(shell_history),
+    shell_completions,
+};
+
+static void nrf24l01_interrupt_callback(uint8_t type, uint8_t num, uint8_t *buf, uint8_t len)
+{
+    switch (type)
+    {
+        case NRF24L01_INTERRUPT_RX_DR :
+        {
+            uint8_t i;
+            
+            nrf24l01_interface_debug_print("nrf24l01: irq receive with pipe %d with %d.\n", num, len);
+            for (i = 0; i < len; i++)
+            {
+                nrf24l01_interface_debug_print("0x%02X ", buf[i]);
+            }
+            nrf24l01_interface_debug_print(".\n");
+            
+            break;
+        }
+        case NRF24L01_INTERRUPT_TX_DS :
+        {
+            nrf24l01_interface_debug_print("nrf24l01: irq send ok.\n");
+            
+            break;
+        }
+        case NRF24L01_INTERRUPT_MAX_RT :
+        {
+            nrf24l01_interface_debug_print("nrf24l01: irq reach max retry times.\n");
+            
+            break;
+        }
+        case NRF24L01_INTERRUPT_TX_FULL :
+        {
+            break;
+        }
+        default :
+        {
+            break;
+        }
+    }
+}
+
+
 /*
  * Application entry point.
  */
@@ -517,48 +609,6 @@ int main(void) {
   halInit();
   chSysInit();
   RTTchannelObjectInit(&RTT_S0);
-
-  DRIVER_W25QXX_LINK_INIT(&w25qxx_handle, &spi_config);
-  DRIVER_W25QXX_LINK_SPI_QSPI_INIT(&w25qxx_handle, w25qxx_interface_spi_qspi_init);
-  DRIVER_W25QXX_LINK_SPI_QSPI_DEINIT(&w25qxx_handle, w25qxx_interface_spi_qspi_deinit);
-  DRIVER_W25QXX_LINK_SPI_QSPI_WRITE_READ(&w25qxx_handle, w25qxx_interface_spi_qspi_write_read);
-  DRIVER_W25QXX_LINK_DELAY_MS(&w25qxx_handle, w25qxx_interface_delay_ms);
-  DRIVER_W25QXX_LINK_DELAY_US(&w25qxx_handle, w25qxx_interface_delay_us);
-  DRIVER_W25QXX_LINK_DEBUG_PRINT(&w25qxx_handle, w25qxx_interface_debug_print);
-  w25qxx_set_interface(&w25qxx_handle, W25QXX_INTERFACE_SPI);
-  w25qxx_set_type(&w25qxx_handle, W25Q64);
-  w25qxx_init(&w25qxx_handle);
-  
-  // Initialize SPI
-  // spiStart(&SPID1, &spi_config);
-
-  // chThdSleepMilliseconds(1000);
-  
-  // // Test SPI communication
-  // static uint8_t tx[4] = {0x9F, 0x00, 0x00, 0x00};  // JEDEC ID command
-  // static uint8_t rx[4] = {0x00, 0x00, 0x00, 0x00};
-  
-  // chprintf((BaseSequentialStream *)&RTT_S0, "Testing SPI communication...\n");
-  
-  // spiSelect(&SPID1);
-  // msg_t res = spiExchange(&SPID1, 4, tx, rx);
-  // spiUnselect(&SPID1);
-  
-  // if (res == MSG_OK) {
-  //   chprintf((BaseSequentialStream *)&RTT_S0, "SPI Exchange OK\n");
-  //   chprintf((BaseSequentialStream *)&RTT_S0, "TX: 0x%02x 0x%02x 0x%02x 0x%02x\n", tx[0], tx[1], tx[2], tx[3]);
-  //   chprintf((BaseSequentialStream *)&RTT_S0, "RX: 0x%02x 0x%02x 0x%02x 0x%02x\n", rx[0], rx[1], rx[2], rx[3]);
-    
-  //   // Check if we got valid JEDEC ID response
-  //   if (rx[0] != 0x00 || rx[1] != 0x00 || rx[2] != 0x00) {
-  //     chprintf((BaseSequentialStream *)&RTT_S0, "Flash JEDEC ID: 0x%02x%02x%02x\n", rx[0], rx[1], rx[2]);
-  //   } else {
-  //     chprintf((BaseSequentialStream *)&RTT_S0, "No response from flash - check connections\n");
-  //   }
-  // } else {
-  //   chprintf((BaseSequentialStream *)&RTT_S0, "SPI exchange failed: %d\n", res);
-  // }
-  
 
   uint8_t mac_address[6] = {0x02, 0x12, 0x13, 0x10, 0x15, 0x05};
 
@@ -592,23 +642,38 @@ int main(void) {
   chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO+1, Thread1, NULL);
   chThdCreateStatic(waUdpServer, sizeof(waUdpServer), NORMALPRIO, UdpServerThread, NULL);
   chThdCreateStatic(waTestHID, sizeof(waTestHID), NORMALPRIO, ThreadTestHID, NULL);
+  chThdCreateStatic(waUsbHost, sizeof(waUsbHost), NORMALPRIO+2, UsbHostThread, NULL);
 
-  #if STM32_USBH_USE_OTG1
-      usbhStart(&USBHD1);
-      chprintf((BaseSequentialStream *)&RTT_S0, "USBH OTG2 start requested\n");
-  #endif
-  #if STM32_USBH_USE_OTG2
-      usbhStart(&USBHD2);
-      chprintf((BaseSequentialStream *)&RTT_S0, "USBH OTG2 started");
-  #endif
+  // DRIVER_W25QXX_LINK_INIT(&w25qxx_handle, w25qxx_handle_t);
+  // DRIVER_W25QXX_LINK_SPI_QSPI_INIT(&w25qxx_handle, w25qxx_interface_spi_qspi_init);
+  // DRIVER_W25QXX_LINK_SPI_QSPI_DEINIT(&w25qxx_handle, w25qxx_interface_spi_qspi_deinit);
+  // DRIVER_W25QXX_LINK_SPI_QSPI_WRITE_READ(&w25qxx_handle, w25qxx_interface_spi_qspi_write_read);
+  // DRIVER_W25QXX_LINK_DELAY_MS(&w25qxx_handle, w25qxx_interface_delay_ms);
+  // DRIVER_W25QXX_LINK_DELAY_US(&w25qxx_handle, w25qxx_interface_delay_us);
+  // DRIVER_W25QXX_LINK_DEBUG_PRINT(&w25qxx_handle, w25qxx_interface_debug_print);
+  // w25qxx_set_interface(&w25qxx_handle, W25QXX_INTERFACE_SPI);
+  // w25qxx_set_type(&w25qxx_handle, W25Q64);
+  // w25qxx_init(&w25qxx_handle);
+  // uint8_t manufacturer;
+  // uint8_t manufacturer_id[2];
+  // w25qxx_get_jedec_id(&w25qxx_handle, &manufacturer, manufacturer_id);
+  // chprintf((BaseSequentialStream *)&RTT_S0, "Manufacturer: 0x%02x, Manufacturer ID: 0x%02x%02x\n", manufacturer, manufacturer_id[0], manufacturer_id[1]);
 
+  uint8_t res = nrf24l01_basic_init(NRF24L01_MODE_RX, nrf24l01_interrupt_callback);
+  // static uint8_t addr[5] = NRF24L01_BASIC_DEFAULT_RX_ADDR_0;
+  // if (nrf24l01_basic_send((uint8_t *)addr, (uint8_t *)"123", 3) != 0);
+  // {
+  //     (void)nrf24l01_basic_deinit();
+  // }
+
+  usbhStart(&USBHD2);
+  chprintf((BaseSequentialStream *)&RTT_S0, "USBH OTG2 started");
+  
   while (1) {
-    #if STM32_USBH_USE_OTG2
-      usbhMainLoop(&USBHD2);
-    #endif
-    #if STM32_USBH_USE_OTG1
-      usbhMainLoop(&USBHD1);
-    #endif
-    chThdSleepMilliseconds(1000);
+    thread_t *shelltp = chThdCreateFromHeap(NULL, SHELL_WA_SIZE,
+      "shell", NORMALPRIO + 1,
+      shellThread, (void *)&shell_cfg1);
+    chThdWait(shelltp); /* Waiting termination. */
+    chThdSleepMilliseconds(500);
   }
 }

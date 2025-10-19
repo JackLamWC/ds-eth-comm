@@ -108,6 +108,7 @@ include $(CHIBIOS)/os/hal/osal/rt-nil/osal.mk
 include $(CHIBIOS)/os/rt/rt.mk
 include $(CHIBIOS)/os/common/ports/ARMv7-M/compilers/GCC/mk/port.mk
 include $(CHIBIOS)/os/hal/lib/streams/streams.mk
+include $(CHIBIOS)/os/various/shell/shell.mk
 # Auto-build files in ./source recursively.
 include $(CHIBIOS)/tools/mk/autobuild.mk
 
@@ -124,6 +125,9 @@ CSRC = $(ALLCSRC) \
        ./src/RTT/SEGGER_RTT_Channel.c \
        ./src/w25qxx/w25qxx.c \
        ./src/w25qxx/w25qxx_interface.c \
+       ./src/nrf24l01/nrf24l01.c \
+       ./src/nrf24l01/nrf24l01_interface.c \
+       ./src/nrf24l01/nrf24l01_basic.c \
        main.c
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
@@ -137,7 +141,7 @@ ASMSRC = $(ALLASMSRC)
 ASMXSRC = $(ALLXASMSRC)
 
 # Inclusion directories.
-INCDIR = $(CONFDIR) $(BOARDDIR) $(ALLINC) ./src/RTT ./src/w25qxx
+INCDIR = $(CONFDIR) $(BOARDDIR) $(ALLINC) ./src/RTT ./src/w25qxx ./src/nrf24l01
 
 # Define C warning options here.
 CWARN = -Wall -Wextra -Wundef -Wstrict-prototypes
@@ -154,7 +158,9 @@ CPPWARN = -Wall -Wextra -Wundef
 #
 
 # List all user C define here, like -D_DEBUG=1
-UDEFS = 
+UDEFS = -DSHELL_CMD_TEST_ENABLED=0 -DSHELL_USE_HISTORY=1 -DSHELL_USE_COMPLETION=1 -DSHELL_USE_ESC_SEQ=1 \
+        -DCHPRINTF_USE_FLOAT=1 -DTMC5160_IC_CACHE_COUNT=6
+
 
 # Define ASM defines here
 UADEFS =
@@ -166,7 +172,7 @@ UINCDIR =
 ULIBDIR =
 
 # List all user libraries here
-ULIBS =
+ULIBS = -lm
 
 #
 # End of user section
