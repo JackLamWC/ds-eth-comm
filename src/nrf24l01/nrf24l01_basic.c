@@ -45,9 +45,16 @@
   *         - 1 run failed
   * @note   none
   */
- void nrf24l01_interrupt_irq_handler(void* arg)
+ uint8_t nrf24l01_interrupt_irq_handler(void)
  {
-    nrf24l01_irq_handler(&gs_handle);
+     if (nrf24l01_irq_handler(&gs_handle) != 0)
+     {
+         return 1;
+     }
+     else
+     {
+         return 0;
+     }
  }
  
  /**

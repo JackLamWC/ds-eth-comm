@@ -928,6 +928,7 @@
         
          return 1;                                                                        /* return error */
      }
+     prev = 0x00;
      prev &= ~(3 << 0);                                                                   /* clear config */
      prev |= width << 0;                                                                  /* set width */
      res = a_nrf24l01_spi_write(handle, NRF24L01_REG_SETUP_AW, (uint8_t *)&prev, 1);      /* set setup of address widths */

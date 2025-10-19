@@ -553,7 +553,7 @@ static const ShellConfig shell_cfg1 = {
     shell_completions,
 };
 
-static void nrf24l01_interrupt_callback(uint8_t type, uint8_t num, uint8_t *buf, uint8_t len)
+static void interrupt_callback(uint8_t type, uint8_t num, uint8_t *buf, uint8_t len)
 {
     switch (type)
     {
@@ -640,31 +640,31 @@ int main(void) {
   chMtxObjectInit(&joyMtx);
 
   chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO+1, Thread1, NULL);
-  chThdCreateStatic(waUdpServer, sizeof(waUdpServer), NORMALPRIO, UdpServerThread, NULL);
+  // chThdCreateStatic(waUdpServer, sizeof(waUdpServer), NORMALPRIO, UdpServerThread, NULL);
   chThdCreateStatic(waTestHID, sizeof(waTestHID), NORMALPRIO, ThreadTestHID, NULL);
   chThdCreateStatic(waUsbHost, sizeof(waUsbHost), NORMALPRIO+2, UsbHostThread, NULL);
 
-  // DRIVER_W25QXX_LINK_INIT(&w25qxx_handle, w25qxx_handle_t);
-  // DRIVER_W25QXX_LINK_SPI_QSPI_INIT(&w25qxx_handle, w25qxx_interface_spi_qspi_init);
-  // DRIVER_W25QXX_LINK_SPI_QSPI_DEINIT(&w25qxx_handle, w25qxx_interface_spi_qspi_deinit);
-  // DRIVER_W25QXX_LINK_SPI_QSPI_WRITE_READ(&w25qxx_handle, w25qxx_interface_spi_qspi_write_read);
-  // DRIVER_W25QXX_LINK_DELAY_MS(&w25qxx_handle, w25qxx_interface_delay_ms);
-  // DRIVER_W25QXX_LINK_DELAY_US(&w25qxx_handle, w25qxx_interface_delay_us);
-  // DRIVER_W25QXX_LINK_DEBUG_PRINT(&w25qxx_handle, w25qxx_interface_debug_print);
-  // w25qxx_set_interface(&w25qxx_handle, W25QXX_INTERFACE_SPI);
-  // w25qxx_set_type(&w25qxx_handle, W25Q64);
-  // w25qxx_init(&w25qxx_handle);
-  // uint8_t manufacturer;
-  // uint8_t manufacturer_id[2];
-  // w25qxx_get_jedec_id(&w25qxx_handle, &manufacturer, manufacturer_id);
-  // chprintf((BaseSequentialStream *)&RTT_S0, "Manufacturer: 0x%02x, Manufacturer ID: 0x%02x%02x\n", manufacturer, manufacturer_id[0], manufacturer_id[1]);
+  DRIVER_W25QXX_LINK_INIT(&w25qxx_handle, w25qxx_handle_t);
+  DRIVER_W25QXX_LINK_SPI_QSPI_INIT(&w25qxx_handle, w25qxx_interface_spi_qspi_init);
+  DRIVER_W25QXX_LINK_SPI_QSPI_DEINIT(&w25qxx_handle, w25qxx_interface_spi_qspi_deinit);
+  DRIVER_W25QXX_LINK_SPI_QSPI_WRITE_READ(&w25qxx_handle, w25qxx_interface_spi_qspi_write_read);
+  DRIVER_W25QXX_LINK_DELAY_MS(&w25qxx_handle, w25qxx_interface_delay_ms);
+  DRIVER_W25QXX_LINK_DELAY_US(&w25qxx_handle, w25qxx_interface_delay_us);
+  DRIVER_W25QXX_LINK_DEBUG_PRINT(&w25qxx_handle, w25qxx_interface_debug_print);
+  w25qxx_set_interface(&w25qxx_handle, W25QXX_INTERFACE_SPI);
+  w25qxx_set_type(&w25qxx_handle, W25Q64);
+  w25qxx_init(&w25qxx_handle);
+  uint8_t manufacturer;
+  uint8_t manufacturer_id[2];
+  w25qxx_get_jedec_id(&w25qxx_handle, &manufacturer, manufacturer_id);
+  chprintf((BaseSequentialStream *)&RTT_S0, "Manufacturer: 0x%02x, Manufacturer ID: 0x%02x%02x\n", manufacturer, manufacturer_id[0], manufacturer_id[1]);
 
-  uint8_t res = nrf24l01_basic_init(NRF24L01_MODE_RX, nrf24l01_interrupt_callback);
-  // static uint8_t addr[5] = NRF24L01_BASIC_DEFAULT_RX_ADDR_0;
-  // if (nrf24l01_basic_send((uint8_t *)addr, (uint8_t *)"123", 3) != 0);
-  // {
-  //     (void)nrf24l01_basic_deinit();
-  // }
+  uint8_t res = nrf24l01_basic_init(NRF24L01_MODE_TX, interrupt_callback);
+  static uint8_t addr[5] = NRF24L01_BASIC_DEFAULT_RX_ADDR_0;
+  if (nrf24l01_basic_send((uint8_t *)addr, (uint8_t *)"123", 3) != 0);
+  {
+      (void)nrf24l01_basic_deinit();
+  }
 
   usbhStart(&USBHD2);
   chprintf((BaseSequentialStream *)&RTT_S0, "USBH OTG2 started");

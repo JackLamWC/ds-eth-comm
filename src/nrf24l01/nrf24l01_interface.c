@@ -12,8 +12,8 @@ static SPIConfig nrf24l01_spi_config = {
     .slave = false,
     .data_cb = NULL,
     .error_cb = NULL,
-    .cfg1 = SPI_CFG1_MBR_1 | SPI_CFG1_MBR_2 | SPI_CFG1_MBR_0 | SPI_CFG1_DSIZE_8BITS,
-    .cfg2 = SPI_CFG2_CPHA | SPI_CFG2_CPOL
+    .cfg1 = SPI_CFG1_MBR_1 | SPI_CFG1_MBR_2 | SPI_CFG1_MBR_0| SPI_CFG1_DSIZE_8BITS,
+    .cfg2 = SPI_CFG2_CPHA
 };
 
 uint8_t nrf24l01_interface_spi_init(void) {
@@ -25,18 +25,26 @@ uint8_t nrf24l01_interface_spi_init(void) {
     return 0;
 }
 
+void nrf24l01_interface_gpio_interrupt_callback(void) {
+    nrf24l01_interrupt_irq_handler();
+}
+
 uint8_t nrf24l01_interface_gpio_init(void) {
+    palEnableLineEvent(LINE_SPI2_NRF24_IRQ, PAL_EVENT_MODE_BOTH_EDGES);
+    palSetLineCallbackI(LINE_SPI2_NRF24_IRQ, nrf24l01_interface_gpio_interrupt_callback, NULL);
     return 0;
 }
 
 uint8_t nrf24l01_interface_spi_deinit(void) {
     spiStop(&SPID2);
+    palDisableLineEvent(LINE_SPI2_NRF24_IRQ);
+    palSetLineCallbackI(LINE_SPI2_NRF24_IRQ, NULL, NULL);
     return 0;
 }
 
 uint8_t nrf24l01_interface_spi_read(uint8_t reg, uint8_t *buf, uint16_t len) {
-    static uint8_t spi_tx_buffer[SPI_BUFFER_SIZE];
-    static uint8_t spi_rx_buffer[SPI_BUFFER_SIZE];
+    ALIGNED_VAR(CACHE_LINE_SIZE) static uint8_t spi_tx_buffer[SPI_BUFFER_SIZE];
+    ALIGNED_VAR(CACHE_LINE_SIZE) static uint8_t spi_rx_buffer[SPI_BUFFER_SIZE];
     
     // Null pointer check
     if (buf == NULL) {
@@ -44,27 +52,24 @@ uint8_t nrf24l01_interface_spi_read(uint8_t reg, uint8_t *buf, uint16_t len) {
     }
     
     // Buffer size validation
-    if (len == 0 || len > SPI_BUFFER_SIZE) {
-        return 1;  // Error: invalid length (0 or exceeds buffer size)
+    if (len == 0 || (uint32_t)len + 1 > SPI_BUFFER_SIZE) {
+        return 1;
     }
     
     // Prepare SPI transaction: send command, receive data
-    memset(spi_tx_buffer, 0, len + 1);
-    memset(spi_rx_buffer, 0, len + 1);
+    memset(spi_tx_buffer, 0, SPI_BUFFER_SIZE);
+    memset(spi_rx_buffer, 0, SPI_BUFFER_SIZE);
     spi_tx_buffer[0] = reg;  // reg already contains the read command + register address
     
-    // Cache management for DMA coherency
-    SCB_CleanDCache_by_Addr((uint32_t *)spi_tx_buffer, len + 1);  // Ensure DMA sees CPU data
-    SCB_InvalidateDCache_by_Addr((uint32_t *)spi_rx_buffer, len + 1);  // Ensure CPU sees DMA data
+    // Cache management for DMA coherency (flush TX, invalidate RX before DMA)
+    cacheBufferFlush(spi_tx_buffer, SPI_BUFFER_SIZE);
+    cacheBufferInvalidate(spi_rx_buffer, SPI_BUFFER_SIZE);
     
     spiAcquireBus(&SPID2);
     spiSelect(&SPID2);
     msg_t msg = spiExchange(&SPID2, len + 1, spi_tx_buffer, spi_rx_buffer);
     spiUnselect(&SPID2);
     spiReleaseBus(&SPID2);
-    
-    // Ensure received data is visible to CPU
-    SCB_CleanInvalidateDCache_by_Addr((uint32_t *)spi_rx_buffer, len + 1);
     
     // Copy received data to user buffer (skip the first byte which is the command response)
     memcpy(buf, spi_rx_buffer + 1, len);
@@ -77,7 +82,7 @@ uint8_t nrf24l01_interface_spi_read(uint8_t reg, uint8_t *buf, uint16_t len) {
 }
 
 uint8_t nrf24l01_interface_spi_write(uint8_t reg, uint8_t *buf, uint16_t len) {
-    static uint8_t spi_tx_buffer[SPI_BUFFER_SIZE];
+    ALIGNED_VAR(CACHE_LINE_SIZE) static uint8_t spi_tx_buffer[SPI_BUFFER_SIZE];
     
     // Buffer size validation - allow NULL buf for command-only operations
     if (len >= SPI_BUFFER_SIZE) {  // Note: reg is already the command+register
@@ -93,8 +98,8 @@ uint8_t nrf24l01_interface_spi_write(uint8_t reg, uint8_t *buf, uint16_t len) {
         memcpy(spi_tx_buffer + 1, buf, len);
     }
     
-    // Cache management for DMA coherency
-    SCB_CleanDCache_by_Addr((uint32_t *)spi_tx_buffer, len + 1);  // Ensure DMA sees CPU data
+    // Cache management for DMA coherency (flush before DMA reads TX buffer)
+    cacheBufferFlush(spi_tx_buffer, SPI_BUFFER_SIZE);
     spiAcquireBus(&SPID2);
     spiSelect(&SPID2);
     msg_t msg = spiSend(&SPID2, len + 1, spi_tx_buffer);

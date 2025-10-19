@@ -123,6 +123,7 @@
 #define GPIOD_SDRAM_D2              0U
 #define GPIOD_NRF24_CE              0U
 #define GPIOD_SDRAM_D3              1U
+#define GPIOD_SPI2_NRF24_IRQ        1U
 #define GPIOD_SDIO1_CMD             2U
 #define GPIOD_SPI_FLASH_CS          3U
 #define GPIOD_PIN4                  4U
@@ -300,6 +301,7 @@
 #define LINE_SDRAM_D2               PAL_LINE(GPIOD, 0U)
 #define LINE_SPI2_NRF24_CE          PAL_LINE(GPIOD, 0U)
 #define LINE_SDRAM_D3               PAL_LINE(GPIOD, 1U)
+#define LINE_SPI2_NRF24_IRQ         PAL_LINE(GPIOD, 1U)
 #define LINE_SDIO1_CMD              PAL_LINE(GPIOD, 2U)
 #define LINE_SPI_FLASH_CS           PAL_LINE(GPIOD, 3U)
 #define LINE_LCD_DISP               PAL_LINE(GPIOD, 7U)
@@ -806,7 +808,7 @@
  * PD15 - SDRAM_D1                  (alternate 12).
  */
 #define VAL_GPIOD_MODER             (PIN_MODE_OUTPUT(GPIOD_NRF24_CE) |      \
-                                     PIN_MODE_ALTERNATE(GPIOD_SDRAM_D3) |   \
+                                    PIN_MODE_INPUT(GPIOD_SPI2_NRF24_IRQ) | \
                                      PIN_MODE_ALTERNATE(GPIOD_SDIO1_CMD) |  \
                                      PIN_MODE_OUTPUT(GPIOD_SPI_FLASH_CS) |           \
                                      PIN_MODE_INPUT(GPIOD_PIN4) |           \
@@ -822,7 +824,7 @@
                                      PIN_MODE_ALTERNATE(GPIOD_SDRAM_D0) |   \
                                      PIN_MODE_ALTERNATE(GPIOD_SDRAM_D1))
 #define VAL_GPIOD_OTYPER            (PIN_OTYPE_PUSHPULL(GPIOD_NRF24_CE) |   \
-                                     PIN_OTYPE_PUSHPULL(GPIOD_SDRAM_D3) |   \
+                                     PIN_OTYPE_PUSHPULL(GPIOD_SPI2_NRF24_IRQ) |   \
                                      PIN_OTYPE_PUSHPULL(GPIOD_SDIO1_CMD) |  \
                                      PIN_OTYPE_PUSHPULL(GPIOD_SPI_FLASH_CS) |       \
                                      PIN_OTYPE_PUSHPULL(GPIOD_PIN4) |       \
@@ -838,7 +840,7 @@
                                      PIN_OTYPE_PUSHPULL(GPIOD_SDRAM_D0) |   \
                                      PIN_OTYPE_PUSHPULL(GPIOD_SDRAM_D1))
 #define VAL_GPIOD_OSPEEDR           (PIN_OSPEED_HIGH(GPIOD_NRF24_CE) |      \
-                                     PIN_OSPEED_HIGH(GPIOD_SDRAM_D3) |      \
+                                     PIN_OSPEED_HIGH(GPIOD_SPI2_NRF24_IRQ) |      \
                                      PIN_OSPEED_HIGH(GPIOD_SDIO1_CMD) |     \
                                      PIN_OSPEED_HIGH(GPIOD_SPI_FLASH_CS) |       \
                                      PIN_OSPEED_VERYLOW(GPIOD_PIN4) |       \
@@ -854,7 +856,7 @@
                                      PIN_OSPEED_HIGH(GPIOD_SDRAM_D0) |      \
                                      PIN_OSPEED_HIGH(GPIOD_SDRAM_D1))
 #define VAL_GPIOD_PUPDR             (PIN_PUPDR_PULLUP(GPIOD_NRF24_CE) |     \
-                                     PIN_PUPDR_FLOATING(GPIOD_SDRAM_D3) |   \
+                                     PIN_PUPDR_PULLUP(GPIOD_SPI2_NRF24_IRQ) |   \
                                      PIN_PUPDR_FLOATING(GPIOD_SDIO1_CMD) |  \
                                      PIN_PUPDR_PULLUP(GPIOD_SPI_FLASH_CS) |       \
                                      PIN_PUPDR_FLOATING(GPIOD_PIN4) |       \
@@ -870,7 +872,7 @@
                                      PIN_PUPDR_FLOATING(GPIOD_SDRAM_D0) |   \
                                      PIN_PUPDR_FLOATING(GPIOD_SDRAM_D1))
 #define VAL_GPIOD_ODR               (PIN_ODR_HIGH(GPIOD_NRF24_CE) |         \
-                                     PIN_ODR_HIGH(GPIOD_SDRAM_D3) |         \
+                                    PIN_ODR_HIGH(GPIOD_SPI2_NRF24_IRQ) |         \
                                      PIN_ODR_HIGH(GPIOD_SDIO1_CMD) |        \
                                      PIN_ODR_HIGH(GPIOD_SPI_FLASH_CS) |             \
                                      PIN_ODR_HIGH(GPIOD_PIN4) |             \
@@ -886,7 +888,7 @@
                                      PIN_ODR_HIGH(GPIOD_SDRAM_D0) |         \
                                      PIN_ODR_HIGH(GPIOD_SDRAM_D1))
 #define VAL_GPIOD_AFRL              (PIN_AFIO_AF(GPIOD_NRF24_CE, 0U) |      \
-                                     PIN_AFIO_AF(GPIOD_SDRAM_D3, 12U) |     \
+                                    PIN_AFIO_AF(GPIOD_SPI2_NRF24_IRQ, 0U) |     \
                                      PIN_AFIO_AF(GPIOD_SDIO1_CMD, 12U) |    \
                                      PIN_AFIO_AF(GPIOD_SPI_FLASH_CS, 0U) |          \
                                      PIN_AFIO_AF(GPIOD_PIN4, 0U) |          \

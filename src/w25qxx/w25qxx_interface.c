@@ -111,8 +111,8 @@ uint8_t w25qxx_interface_spi_qspi_write_read(uint8_t instruction, uint8_t instru
                                              uint8_t dummy, uint8_t *in_buf, uint32_t in_len,
                                              uint8_t *out_buf, uint32_t out_len, uint8_t data_line)
 {
-   static uint8_t spi_tx_buffer[SPI_BUFFER_SIZE];
-   static uint8_t spi_rx_buffer[SPI_BUFFER_SIZE];
+   ALIGNED_VAR(CACHE_LINE_SIZE) static uint8_t spi_tx_buffer[SPI_BUFFER_SIZE];
+   ALIGNED_VAR(CACHE_LINE_SIZE) static uint8_t spi_rx_buffer[SPI_BUFFER_SIZE];
    msg_t msg;
    uint32_t total_len = in_len + out_len;
    
@@ -134,17 +134,14 @@ uint8_t w25qxx_interface_spi_qspi_write_read(uint8_t instruction, uint8_t instru
        memcpy(spi_tx_buffer, in_buf, in_len);
    }
 
-   // Cache management for DMA coherency
-   SCB_CleanDCache_by_Addr((uint32_t *)spi_tx_buffer, total_len);  // Ensure DMA sees CPU data
-   SCB_InvalidateDCache_by_Addr((uint32_t *)spi_rx_buffer, total_len);  // Ensure CPU sees DMA data
+   // Cache management for DMA coherency (flush TX, invalidate RX before DMA)
+   cacheBufferFlush(spi_tx_buffer, total_len);
+   cacheBufferInvalidate(spi_rx_buffer, total_len);
 
    spiAcquireBus(&SPID1);
    spiSelect(&SPID1);
    
    spiExchange(&SPID1, total_len, spi_tx_buffer, spi_rx_buffer);
-   
-   // Ensure received data is visible to CPU
-   SCB_CleanInvalidateDCache_by_Addr((uint32_t *)spi_rx_buffer, total_len);
    
    // Copy output data only if output buffer is valid and length > 0
    if (out_buf != NULL && out_len > 0) {

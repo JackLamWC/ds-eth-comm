@@ -111,7 +111,7 @@
   *         - 1 run failed
   * @note   none
   */
- void nrf24l01_interrupt_irq_handler(void *arg);
+ uint8_t nrf24l01_interrupt_irq_handler(void);
  
  /**
   * @brief     basic example init
