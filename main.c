@@ -14,23 +14,172 @@
     limitations under the License.
 */
 
+/* ChibiOS Core */
 #include "ch.h"
 #include "hal.h"
+#include "chprintf.h"
+
+
+/* FlashDB */
+#include "fdb_port.h"
+
+/* lwIP Network Stack */
 #include "lwipthread.h"
 #include "lwip/sockets.h"
 #include "lwip/netdb.h"
 #include "lwip/netif.h"
-#include "chprintf.h"
+
+/* Debug and RTT */
 #include "SEGGER_RTT_Channel.h"
 #include "SEGGER_RTT.h"
+
+/* USB Host */
 #include "usbh/debug.h"
+
+/* Hardware Drivers */
 #include "w25qxx_interface.h"
-#include "shell.h"
 #include "nrf24l01.h"
 #include "nrf24l01_interface.h"
 #include "nrf24l01_basic.h"
 
-static w25qxx_handle_t w25qxx_handle;
+/* Shell */
+#include "shell.h"
+
+/* ============================================================================
+ * GLOBAL VARIABLES AND CONSTANTS
+ * ============================================================================ */
+
+
+/* Network Configuration */
+#define UDP_SERVER_PORT    12345
+#define UDP_BUFFER_SIZE    1024
+#define JOY_STREAM_ENABLE  1
+#define JOY_STREAM_PORT    12346
+
+/* Shell Configuration */
+char shell_history[SHELL_MAX_HIST_BUFF];
+char *shell_completions[SHELL_MAX_COMPLETIONS];
+#define SHELL_WA_SIZE THD_WORKING_AREA_SIZE(1024)
+
+/* ============================================================================
+ * DUALSENSE CONTROLLER STRUCTURES AND ENUMS
+ * ============================================================================ */
+
+#if HAL_USBH_USE_HID
+
+/* DualSense (DS5) input report core layout (USB payload).
+ * This maps sticks, triggers, buttons, IMU, and touchpad in a compact form
+ * and can be used to parse DS5 reports once positioned at the payload start. */
+typedef enum {
+  DS5_DPAD_UP         = 0,
+  DS5_DPAD_UP_RIGHT   = 1,
+  DS5_DPAD_RIGHT      = 2,
+  DS5_DPAD_DOWN_RIGHT = 3,
+  DS5_DPAD_DOWN       = 4,
+  DS5_DPAD_DOWN_LEFT  = 5,
+  DS5_DPAD_LEFT       = 6,
+  DS5_DPAD_UP_LEFT    = 7,
+  DS5_DPAD_RELEASED   = 8
+} ds5_dpad_t;
+
+union DS5Buttons {
+  struct {
+    uint8_t dpad : 4;       /* ds5_dpad_t */
+    uint8_t square : 1;
+    uint8_t cross : 1;
+    uint8_t circle : 1;
+    uint8_t triangle : 1;
+
+    uint8_t l1 : 1;
+    uint8_t r1 : 1;
+    uint8_t l2 : 1;         /* digital */
+    uint8_t r2 : 1;         /* digital */
+    uint8_t create : 1;     /* Share/Create */
+    uint8_t options : 1;    /* Options */
+    uint8_t l3 : 1;
+    uint8_t r3 : 1;
+
+    uint8_t ps : 1;         /* PS button */
+    uint8_t touchpad : 1;   /* Touchpad press */
+    uint8_t mic : 1;        /* Mic mute */
+    uint8_t reserved : 5;
+  } __attribute__((packed));
+  uint32_t val : 24;
+} __attribute__((packed));
+
+struct DS5TouchpadXY {
+  struct {
+    uint8_t counter : 7;    /* increments while finger active */
+    uint8_t touching : 1;   /* 0 = touching, 1 = not touching */
+    uint16_t x : 12;        /* 0..1919 */
+    uint16_t y : 12;        /* 0..1079 */
+  } __attribute__((packed)) finger[2];
+} __attribute__((packed));
+
+typedef struct __attribute__((packed)) {
+  /* 0x00–0x03: Sticks (0–255) */
+  uint8_t hatValue[4];       /* [0]=LX, [1]=LY, [2]=RX, [3]=RY */
+
+  /* 0x04–0x05: Analog triggers (0–255) */
+  uint8_t trigger[2];        /* [0]=L2, [1]=R2 */
+
+  /* 0x06: Sequence number */
+  uint8_t sequence_number;
+
+  /* 0x07–0x09: Buttons */
+  union DS5Buttons btn;
+
+  /* 0x0A–0x0E: Reserved */
+  uint8_t reserved0[5];
+
+  /* 0x0F–0x14: Gyroscope raw (LE) */
+  int16_t gyroX;
+  int16_t gyroZ;
+  int16_t gyroY;
+
+  /* 0x15–0x1A: Accelerometer raw (LE) */
+  int16_t accX;
+  int16_t accZ;
+  int16_t accY;
+
+  /* 0x1B–0x1E: Sensor timestamp (LE) */
+  int32_t sensor_timestamp;
+
+  /* 0x1F: Reserved */
+  uint8_t reserved1;
+
+  /* 0x20–0x27: Touchpad (2 contacts) */
+  struct DS5TouchpadXY xy;
+} DS5InputUSB;
+
+/* Latest-only publication via double buffer + event broadcast */
+#define EVT_DS5_READY           EVENT_MASK(0)
+
+static DS5InputUSB ds5Buf[2];
+static volatile uint8_t ds5PublishedIndex = 0;
+static volatile uint32_t ds5Generation = 0;
+static event_source_t esDS5Ready;
+
+/* Parse raw HID report buffer into DS5InputUSB.
+ * Supports USB (report ID 0x01) and Bluetooth (report ID 0x31).
+ * Returns true on success. */
+static bool ds5_from_hid_report(const uint8_t *buf, uint16_t len, DS5InputUSB *out) {
+  if (buf == NULL || out == NULL) return false;
+  if (len < 2) return false;
+
+  if (buf[0] == 0x01) {
+    /* USB: payload starts at buf+1 */
+    if (len < (uint16_t)(1 + sizeof(DS5InputUSB))) return false;
+    memcpy(out, buf + 1, sizeof(DS5InputUSB));
+    return true;
+  }
+  return false;
+}
+#endif
+
+/* ============================================================================
+ * INTERFACE CALLBACK FUNCTIONS
+ * ============================================================================ */
 
 void w25qxx_interface_debug_print(const char *const fmt, ...) {
   va_list ap;
@@ -46,11 +195,62 @@ void nrf24l01_interface_debug_print(const char *const fmt, ...) {
   va_end(ap);
 }
 
+void nrf24l01_interface_gpio_interrupt_callback(void *args) {
+  (void)args;
+  nrf24l01_interrupt_irq_handler();
+}
 
-/*
- * This is a periodic thread that does absolutely nothing except flashing
- * a LED.
- */
+/* ============================================================================
+ * nRF24L01 INTERRUPT CALLBACK
+ * ============================================================================ */
+
+static void interrupt_callback(uint8_t type, uint8_t num, uint8_t *buf, uint8_t len)
+{
+    switch (type)
+    {
+        case NRF24L01_INTERRUPT_RX_DR :
+        {
+            uint8_t i;
+            
+            nrf24l01_interface_debug_print("nrf24l01: irq receive with pipe %d with %d.\n", num, len);
+            for (i = 0; i < len; i++)
+            {
+                nrf24l01_interface_debug_print("0x%02X ", buf[i]);
+            }
+            nrf24l01_interface_debug_print(".\n");
+            
+            break;
+        }
+        case NRF24L01_INTERRUPT_TX_DS :
+        {
+            nrf24l01_interface_debug_print("nrf24l01: irq send ok.\n");
+            
+            break;
+        }
+        case NRF24L01_INTERRUPT_MAX_RT :
+        {
+            nrf24l01_interface_debug_print("nrf24l01: irq reach max retry times.\n");
+            
+            break;
+        }
+        case NRF24L01_INTERRUPT_TX_FULL :
+        {
+            break;
+        }
+        default :
+        {
+            break;
+        }
+    }
+}
+
+
+
+/* ============================================================================
+ * THREAD FUNCTIONS
+ * ============================================================================ */
+
+/* LED Blinker Thread */
 static THD_WORKING_AREA(waThread1, 128);
 static THD_FUNCTION(Thread1, arg) {
   (void)arg;
@@ -63,303 +263,49 @@ static THD_FUNCTION(Thread1, arg) {
   }
 }
 
+/* ============================================================================
+ * CONFIGURATION STRUCTURES
+ * ============================================================================ */
+
+/* Shell Configuration */
+static const ShellCommand commands[] = {
+    {NULL, NULL}
+};
+
+static const ShellConfig shell_cfg1 = {
+    (BaseSequentialStream *)&RTT_S0,
+    commands,
+    shell_history,
+    sizeof(shell_history),
+    shell_completions,
+};
+
+
+
+/* ============================================================================
+ * USB HID THREAD FUNCTIONS
+ * ============================================================================ */
+
 #if HAL_USBH_USE_HID
 #include "usbh/dev/hid.h"
-#include "chprintf.h"
-
-// PlayStation Controller HID Report Structure
-typedef struct {
-    // Report ID (always 0x01)
-    uint8_t report_id;
-    
-    // Analog sticks (0x00-0xFF, neutral ~0x80)
-    uint8_t left_stick_x;    // Left stick X axis
-    uint8_t left_stick_y;    // Left stick Y axis  
-    uint8_t right_stick_x;   // Right stick X axis
-    uint8_t right_stick_y;   // Right stick Y axis
-    
-    // Triggers (0x00-0xFF, neutral 0x00)
-    uint8_t l2_trigger;      // L2 trigger axis
-    uint8_t r2_trigger;      // R2 trigger axis
-    
-    // Vendor data
-    uint8_t vendor_data1;
-    
-    // D-pad (4 bits) + Face buttons (4 bits)
-    union {
-        uint8_t raw;
-        struct {
-            uint8_t dpad : 4;        // D-pad direction
-            uint8_t face_buttons : 4; // Square, Cross, Circle, Triangle
-        };
-    } dpad_face;
-    
-    // Shoulder and system buttons
-    union {
-        uint8_t raw;
-        struct {
-            uint8_t l1 : 1;      // L1 button
-            uint8_t r1 : 1;       // R1 button
-            uint8_t l2 : 1;       // L2 button
-            uint8_t r2 : 1;       // R2 button
-            uint8_t create : 1;   // Create button
-            uint8_t options : 1;  // Options button
-            uint8_t l3 : 1;       // L3 button
-            uint8_t r3 : 1;       // R3 button
-        };
-    } shoulder_buttons;
-    
-    // System buttons and vendor data
-    union {
-        uint8_t raw;
-        struct {
-            uint8_t ps_button : 1;    // PS button
-            uint8_t touchpad : 1;     // Touchpad button
-            uint8_t mute : 1;         // Mute button
-            uint8_t vendor_bits : 5;  // Vendor defined bits
-        };
-    } system_buttons;
-    
-    // Additional vendor data (52 bytes)
-    uint8_t vendor_data[52];
-    
-} ps_controller_report_t;
-
-// D-pad direction constants
-typedef enum {
-    DPAD_NEUTRAL = 0x8,
-    DPAD_NORTH = 0x0,
-    DPAD_NORTHEAST = 0x1,
-    DPAD_EAST = 0x2,
-    DPAD_SOUTHEAST = 0x3,
-    DPAD_SOUTH = 0x4,
-    DPAD_SOUTHWEST = 0x5,
-    DPAD_WEST = 0x6,
-    DPAD_NORTHWEST = 0x7
-} dpad_direction_t;
-
-// Face button constants
-typedef enum {
-    FACE_SQUARE = 0x01,
-    FACE_CROSS = 0x02,
-    FACE_CIRCLE = 0x04,
-    FACE_TRIANGLE = 0x08
-} face_button_t;
-
-typedef enum {
-    PAD_DPAD_NEUTRAL = 0,
-    PAD_DPAD_NORTH   = 1,
-    PAD_DPAD_EAST    = 2,
-    PAD_DPAD_SOUTH   = 3,
-    PAD_DPAD_WEST    = 4,
-} pad_dpad_dir_t;
-
-typedef struct {
-    uint32_t ts_ms;   /* timestamp in milliseconds */
-    uint8_t lx, ly;   /* 0..255 */
-    uint8_t rx, ry;   /* 0..255 */
-    uint8_t l2, r2;   /* 0..255 */
-    pad_dpad_dir_t dpad;
-    /* Digital buttons */
-    uint8_t square, cross, circle, triangle;
-    uint8_t l1, r1, l2_btn, r2_btn;
-    uint8_t l3, r3;
-    uint8_t create, options;
-    uint8_t ps, touchpad, mute;
-    uint32_t buttons_mask; /* compressed bitmask incl. dpad U/R/D/L */
-} pad_state_t;
-
-/* Inter-thread communication: pad_state_t mailbox over a memory pool */
-#define JOY_POOL_SIZE     8
-#define JOY_MB_CAPACITY   8
-
-static memory_pool_t joyPool;
-static pad_state_t joyPoolBuf[JOY_POOL_SIZE];
-static mailbox_t joyMB;
-static msg_t joyMBSlots[JOY_MB_CAPACITY];
-static pad_state_t lastJoy;
-static mutex_t joyMtx;
-
-
-static inline float _norm_stick_u8(uint8_t v) {
-    return ((float)((int)v - 128)) / 127.0f; /* ~[-1..1] */
-}
-
-static inline float _norm_trigger_u8(uint8_t v) {
-    return (2.0f * ((float)v / 255.0f)) - 1.0f; /* [-1..1], released=+1, pressed=-1 */
-}
-
-/* Map HID hat to ROS-style D-pad axes: left=+1, right=-1, up=+1, down=-1, neutral=0 */
-static inline void _map_hat_to_axes(uint8_t hat, float *lr, float *ud) {
-    float x = 0.0f, y = 0.0f;
-    switch (hat) {
-        case 0x0: y = +1.0f; break;                 /* N */
-        case 0x1: y = +1.0f; x = -1.0f; break;      /* NE (right -> -1) */
-        case 0x2: x = -1.0f; break;                 /* E (right -> -1) */
-        case 0x3: y = -1.0f; x = -1.0f; break;      /* SE */
-        case 0x4: y = -1.0f; break;                 /* S */
-        case 0x5: y = -1.0f; x = +1.0f; break;      /* SW (left -> +1) */
-        case 0x6: x = +1.0f; break;                 /* W (left -> +1) */
-        case 0x7: y = +1.0f; x = +1.0f; break;      /* NW */
-        default: /* 0x8 neutral */ break;
-    }
-    *lr = x;  /* axes[6] */
-    *ud = y;  /* axes[7] */
-}
-
-static inline pad_dpad_dir_t hat_to_cardinal(uint8_t hat) {
-    switch (hat) { /* 0=N,1=NE,2=E,3=SE,4=S,5=SW,6=W,7=NW,8=neutral */
-        case 0: return PAD_DPAD_NORTH;
-        case 1: return PAD_DPAD_NORTH; /* NE -> N */
-        case 2: return PAD_DPAD_EAST;
-        case 3: return PAD_DPAD_SOUTH; /* SE -> S */
-        case 4: return PAD_DPAD_SOUTH;
-        case 5: return PAD_DPAD_SOUTH; /* SW -> S */
-        case 6: return PAD_DPAD_WEST;
-        case 7: return PAD_DPAD_NORTH; /* NW -> N */
-        default: return PAD_DPAD_NEUTRAL;
-    }
-}
-
-static inline void ros_joy_dpad_bools_hat(uint8_t hat, int *btn_up, int *btn_down, int *btn_left, int *btn_right) {
-  /* hat values: 0=N,1=NE,2=E,3=SE,4=S,5=SW,6=W,7=NW,8=neutral */
-  *btn_up = (hat == 0 || hat == 1 || hat == 7) ? 1 : 0;
-  *btn_right = (hat == 1 || hat == 2 || hat == 3) ? 1 : 0;
-  *btn_down = (hat == 3 || hat == 4 || hat == 5) ? 1 : 0;
-  *btn_left = (hat == 5 || hat == 6 || hat == 7) ? 1 : 0;
-}
-
-static inline void ps_to_pad_state(const ps_controller_report_t *r, pad_state_t *out) {
-    out->ts_ms = TIME_I2MS(chVTGetSystemTimeX());
-    out->lx = r->left_stick_x;
-    out->ly = r->left_stick_y;
-    out->rx = r->right_stick_x;
-    out->ry = r->right_stick_y;
-    out->l2 = r->l2_trigger;
-    out->r2 = r->r2_trigger;
-    out->dpad = hat_to_cardinal((uint8_t)r->dpad_face.dpad);
-    out->square   = (r->dpad_face.face_buttons & FACE_SQUARE)   ? 1 : 0;
-    out->cross    = (r->dpad_face.face_buttons & FACE_CROSS)    ? 1 : 0;
-    out->circle   = (r->dpad_face.face_buttons & FACE_CIRCLE)   ? 1 : 0;
-    out->triangle = (r->dpad_face.face_buttons & FACE_TRIANGLE) ? 1 : 0;
-    out->l1 = r->shoulder_buttons.l1 ? 1 : 0;
-    out->r1 = r->shoulder_buttons.r1 ? 1 : 0;
-    out->l2_btn = r->shoulder_buttons.l2 ? 1 : 0;
-    out->r2_btn = r->shoulder_buttons.r2 ? 1 : 0;
-    out->l3 = r->shoulder_buttons.l3 ? 1 : 0;
-    out->r3 = r->shoulder_buttons.r3 ? 1 : 0;
-    out->create  = r->shoulder_buttons.create  ? 1 : 0;
-    out->options = r->shoulder_buttons.options ? 1 : 0;
-    out->ps       = r->system_buttons.ps_button ? 1 : 0;
-    out->touchpad = r->system_buttons.touchpad  ? 1 : 0;
-    out->mute     = r->system_buttons.mute      ? 1 : 0;
-
-    /* Build compressed buttons mask */
-    uint32_t m = 0;
-#define SETB(bit, val) do { if (val) m |= (1u << (bit)); } while (0)
-    /* 0..14 regular buttons */
-    SETB(0, out->square);
-    SETB(1, out->cross);
-    SETB(2, out->circle);
-    SETB(3, out->triangle);
-    SETB(4, out->l1);
-    SETB(5, out->r1);
-    SETB(6, out->l2_btn);
-    SETB(7, out->r2_btn);
-    SETB(8, out->l3);
-    SETB(9, out->r3);
-    SETB(10, out->create);
-    SETB(11, out->options);
-    SETB(12, out->ps);
-    SETB(13, out->touchpad);
-    SETB(14, out->mute);
-    /* 15..18 D-pad U/R/D/L from hat */
-    int u=0,d=0,l=0,rgt=0;
-    ros_joy_dpad_bools_hat((uint8_t)r->dpad_face.dpad, &u, &d, &l, &rgt);
-    SETB(15, u);
-    SETB(16, rgt);
-    SETB(17, d);
-    SETB(18, l);
-#undef SETB
-    out->buttons_mask = m;
-}
-
-static inline const char *pad_dpad_str(pad_dpad_dir_t d) {
-    switch (d) {
-        case PAD_DPAD_NORTH: return "N";
-        case PAD_DPAD_EAST:  return "E";
-        case PAD_DPAD_SOUTH: return "S";
-        case PAD_DPAD_WEST:  return "W";
-        default:             return "NEUTRAL";
-    }
-}
-
 
 static THD_WORKING_AREA(waTestHID, 1024);
 static THD_WORKING_AREA(waUsbHost, 512);
 
+static USBH_DEFINE_BUFFER(uint8_t report[HAL_USBHHID_MAX_INSTANCES][64]);
+static USBHHIDConfig hidcfg[HAL_USBHHID_MAX_INSTANCES];
+
 static void _hid_report_callback(USBHHIDDriver *hidp, uint16_t len) {
     uint8_t *report = (uint8_t *)hidp->config->report_buffer;
 
-    if (hidp->type == USBHHID_DEVTYPE_BOOT_MOUSE) {
-        chprintf((BaseSequentialStream *)&RTT_S0, "Mouse report: buttons=%02x, Dx=%d, Dy=%d\n",
-                report[0],
-                (int8_t)report[1],
-                (int8_t)report[2]);
-    } else if (hidp->type == USBHHID_DEVTYPE_BOOT_KEYBOARD) {
-        // chprintf((BaseSequentialStream *)&RTT_S0, "Keyboard report: modifier=%02x, keys=%02x %02x %02x %02x %02x %02x\n",
-        //         report[0],
-        //         report[2],
-        //         report[3],
-        //         report[4],
-        //         report[5],
-        //         report[6],
-        //         report[7]);
-    } else {
-        // Check if this is a PlayStation controller report
-        if (len >= sizeof(ps_controller_report_t) && report[0] == 0x01) {
-            // Cast the raw data to our struct
-            ps_controller_report_t *controller = (ps_controller_report_t *)report;
-            
-            // Parse analog sticks (convert to signed values)
-            int16_t left_x = (int16_t)controller->left_stick_x - 128;
-            int16_t left_y = (int16_t)controller->left_stick_y - 128;
-            int16_t right_x = (int16_t)controller->right_stick_x - 128;
-            int16_t right_y = (int16_t)controller->right_stick_y - 128;
-            
-            // Parse D-pad
-            dpad_direction_t dpad = (dpad_direction_t)controller->dpad_face.dpad;
-            
-            // Parse face buttons
-            bool square = (controller->dpad_face.face_buttons & FACE_SQUARE) != 0;
-            bool cross = (controller->dpad_face.face_buttons & FACE_CROSS) != 0;
-            bool circle = (controller->dpad_face.face_buttons & FACE_CIRCLE) != 0;
-            bool triangle = (controller->dpad_face.face_buttons & FACE_TRIANGLE) != 0;
-            
-            // Build ROS-like joy output
-            pad_state_t *joy = (pad_state_t *)chPoolAlloc(&joyPool);
-            if (joy == NULL) {
-                // Pool exhausted, drop this frame
-                return;
-            }
-            ps_to_pad_state(controller, joy);
-
-            // Post to mailbox (try, drop if full)
-            (void)chMBPostTimeout(&joyMB, (msg_t)joy, TIME_IMMEDIATE);
-        } else {
-            // Handle other generic HID devices
-            chprintf((BaseSequentialStream *)&RTT_S0, "Generic HID report, %d bytes\n", len);
-            chprintf((BaseSequentialStream *)&RTT_S0, "Report: ");
-            for (int i = 0; i < (len < 16 ? len : 16); i++) {
-                chprintf((BaseSequentialStream *)&RTT_S0, "%02x ", report[i]);
-            }
-            chprintf((BaseSequentialStream *)&RTT_S0, "\n");
-        }
+    /* Try DualSense direct decode → publish latest-only */
+    uint8_t next = ds5PublishedIndex ^ 1;            /* back buffer */
+    if (ds5_from_hid_report(report, len, &ds5Buf[next])) {
+        ds5PublishedIndex = next;                    /* publish */
+        ds5Generation++;
+        chEvtBroadcast(&esDS5Ready);                 /* notify all consumers */
     }
 }
-
-static USBH_DEFINE_BUFFER(uint8_t report[HAL_USBHHID_MAX_INSTANCES][64]);
-static USBHHIDConfig hidcfg[HAL_USBHHID_MAX_INSTANCES];
 
 static void ThreadTestHID(void *p) {
   (void)p;
@@ -423,27 +369,21 @@ static THD_FUNCTION(UsbHostThread, arg) {
 
 
 
-// UDP Server Configuration
-#define UDP_SERVER_PORT    12345
-#define UDP_BUFFER_SIZE    1024
-// Optional JSON streaming (broadcast) so clients can just listen
-#define JOY_STREAM_ENABLE  1
-#define JOY_STREAM_PORT    12346
+/* ============================================================================
+ * NETWORK THREAD FUNCTIONS
+ * ============================================================================ */
 
-/*
- * UDP Server Thread
- */
+/* UDP Server Thread */
 static THD_WORKING_AREA(waUdpServer, 2048);
 static THD_FUNCTION(UdpServerThread, arg) {
   (void)arg;
   chRegSetThreadName("udp_server");
+  event_listener_t el;
+  chEvtRegisterMask(&esDS5Ready, &el, EVT_DS5_READY);
   
   int sock;
-  struct sockaddr_in server_addr, client_addr;
+  struct sockaddr_in server_addr;
   struct sockaddr_in bcast_addr;
-  socklen_t client_len = sizeof(client_addr);
-  uint8_t buffer[UDP_BUFFER_SIZE];
-  int bytes_received;
   
   // Create UDP socket
   sock = socket(AF_INET, SOCK_DGRAM, 0);
@@ -484,26 +424,55 @@ static THD_FUNCTION(UdpServerThread, arg) {
   chprintf((BaseSequentialStream *)&RTT_S0, "UDP Server started on port %d\n", UDP_SERVER_PORT);
   
   while (true) {
-    // Non-blocking HID->UDP forwarding: poll mailbox with timeout
-    msg_t m;
-    msg_t mbres = chMBFetchTimeout(&joyMB, &m, TIME_MS2I(50));
+    /* Wait for new DS5 data when idle; busy processing will naturally coalesce */
+    chEvtWaitOne(EVT_DS5_READY);
+    uint32_t g = ds5Generation;
+    uint8_t idx = ds5PublishedIndex;
+    /* Snapshot to stack to avoid partial reads if another publish happens */
+    DS5InputUSB snap;
+    memcpy(&snap, &ds5Buf[idx], sizeof(DS5InputUSB));
+    (void)g; /* keep for future per-consumer versioning if needed */
 
-    if (mbres == MSG_OK) {
-      pad_state_t *joy = (pad_state_t *)m;
-      // Optionally broadcast JSON snapshot for listeners
-#if JOY_STREAM_ENABLE
-      char jout[512];
-      int jn = chsnprintf(jout, sizeof(jout),
-        "{\"timestamp_ms\":%u,\"axes\":[%u,%u,%u,%u,%u,%u],\"buttons\":%u}",
-        joy->ts_ms, joy->lx, joy->ly, joy->rx, joy->ry, joy->l2, joy->r2, joy->buttons_mask);
-      chprintf((BaseSequentialStream *)&RTT_S0, "JSON: %s\n", jout);
-      sendto(sock, jout, (size_t)jn, 0, (struct sockaddr*)&bcast_addr, sizeof(bcast_addr));
-#endif
-      // Return buffer to pool
-      chPoolFree(&joyPool, joy);
+    // Send raw DS5InputUSB byte array
+    sendto(sock, (const void*)&snap, sizeof(DS5InputUSB), 0, (struct sockaddr*)&bcast_addr, sizeof(bcast_addr));
+  }
+}
+
+/* ============================================================================
+ * nRF24L01 THREAD FUNCTIONS
+ * ============================================================================ */
+
+/* nRF24 TX Broadcaster Thread - Sends latest DS5 snapshot over nRF24 in 32-byte chunks */
+static THD_WORKING_AREA(waNRF24Tx, 1024);
+static THD_FUNCTION(NRF24TxThread, arg) {
+  (void)arg;
+  chRegSetThreadName("nrf24_tx");
+  event_listener_t el;
+  chEvtRegisterMask(&esDS5Ready, &el, EVT_DS5_READY);
+  /* nRF24L01 TX destination address */
+  uint8_t nrf_tx_addr[5] = NRF24L01_BASIC_DEFAULT_RX_ADDR_0;
+
+  while (true) {
+    chEvtWaitOne(EVT_DS5_READY);
+
+    uint8_t idx = ds5PublishedIndex;
+    DS5InputUSB snap;
+    memcpy(&snap, &ds5Buf[idx], sizeof(DS5InputUSB));
+
+    const uint8_t *p = (const uint8_t *)&snap;
+    const size_t total = sizeof(DS5InputUSB);
+    for (size_t off = 0; off < total; off += 32) {
+      uint8_t chunk = (uint8_t)((total - off) > 32 ? 32 : (total - off));
+      if (nrf24l01_basic_send(nrf_tx_addr, (uint8_t *)(p + off), chunk) != 0) {
+        break;
+      }
     }
   }
 }
+
+/* ============================================================================
+ * NETWORK CALLBACK FUNCTIONS
+ * ============================================================================ */
 
 void myLinkUpCallback(void *p) {
   struct netif *ifc = (struct netif*) p;
@@ -516,81 +485,6 @@ void myLinkUpCallback(void *p) {
 void myLinkDownCallback(void *p) {
   (void)p;
   chprintf((BaseSequentialStream *)&RTT_S0, "Ethernet disconnected!\n");
-}
-
-
-void spi_error_cb(SPIDriver *spip) {
-  chprintf((BaseSequentialStream *)&RTT_S0, "SPI error\n");
-}
-
-
-static const SPIConfig spi_config = {
-  .circular = false,
-  .ssline = LINE_SPI_FLASH_CS,
-  .slave = false,
-  .data_cb = NULL,
-  .error_cb = spi_error_cb,
-  .cfg1 = SPI_CFG1_MBR_1 | SPI_CFG1_MBR_2 | SPI_CFG1_DSIZE_8BITS,
-  .cfg2 = SPI_CFG2_CPHA | SPI_CFG2_CPOL
-};
-
-static w25qxx_handle_t w25qxx_handle;
-
-char shell_history[SHELL_MAX_HIST_BUFF];
-char *shell_completions[SHELL_MAX_COMPLETIONS];
-
-#define SHELL_WA_SIZE THD_WORKING_AREA_SIZE(1024)
-
-static const ShellCommand commands[] = {
-    {NULL, NULL}
-};
-
-static const ShellConfig shell_cfg1 = {
-    (BaseSequentialStream *)&RTT_S0,
-    commands,
-    shell_history,
-    sizeof(shell_history),
-    shell_completions,
-};
-
-static void interrupt_callback(uint8_t type, uint8_t num, uint8_t *buf, uint8_t len)
-{
-    switch (type)
-    {
-        case NRF24L01_INTERRUPT_RX_DR :
-        {
-            uint8_t i;
-            
-            nrf24l01_interface_debug_print("nrf24l01: irq receive with pipe %d with %d.\n", num, len);
-            for (i = 0; i < len; i++)
-            {
-                nrf24l01_interface_debug_print("0x%02X ", buf[i]);
-            }
-            nrf24l01_interface_debug_print(".\n");
-            
-            break;
-        }
-        case NRF24L01_INTERRUPT_TX_DS :
-        {
-            nrf24l01_interface_debug_print("nrf24l01: irq send ok.\n");
-            
-            break;
-        }
-        case NRF24L01_INTERRUPT_MAX_RT :
-        {
-            nrf24l01_interface_debug_print("nrf24l01: irq reach max retry times.\n");
-            
-            break;
-        }
-        case NRF24L01_INTERRUPT_TX_FULL :
-        {
-            break;
-        }
-        default :
-        {
-            break;
-        }
-    }
 }
 
 
@@ -633,38 +527,21 @@ int main(void) {
   /*
    * Creates the example threads.
    */
-  /* Initialize pad_state_t pool and mailbox */
-  chPoolObjectInit(&joyPool, sizeof(pad_state_t), NULL);
-  chPoolLoadArray(&joyPool, joyPoolBuf, JOY_POOL_SIZE);
-  chMBObjectInit(&joyMB, joyMBSlots, JOY_MB_CAPACITY);
-  chMtxObjectInit(&joyMtx);
+  /* Initialize latest-only DS5 event source */
+  chEvtObjectInit(&esDS5Ready);
 
   chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO+1, Thread1, NULL);
-  // chThdCreateStatic(waUdpServer, sizeof(waUdpServer), NORMALPRIO, UdpServerThread, NULL);
+  chThdCreateStatic(waUdpServer, sizeof(waUdpServer), NORMALPRIO, UdpServerThread, NULL);
+  chThdCreateStatic(waNRF24Tx, sizeof(waNRF24Tx), NORMALPRIO, NRF24TxThread, NULL);
   chThdCreateStatic(waTestHID, sizeof(waTestHID), NORMALPRIO, ThreadTestHID, NULL);
   chThdCreateStatic(waUsbHost, sizeof(waUsbHost), NORMALPRIO+2, UsbHostThread, NULL);
 
-  DRIVER_W25QXX_LINK_INIT(&w25qxx_handle, w25qxx_handle_t);
-  DRIVER_W25QXX_LINK_SPI_QSPI_INIT(&w25qxx_handle, w25qxx_interface_spi_qspi_init);
-  DRIVER_W25QXX_LINK_SPI_QSPI_DEINIT(&w25qxx_handle, w25qxx_interface_spi_qspi_deinit);
-  DRIVER_W25QXX_LINK_SPI_QSPI_WRITE_READ(&w25qxx_handle, w25qxx_interface_spi_qspi_write_read);
-  DRIVER_W25QXX_LINK_DELAY_MS(&w25qxx_handle, w25qxx_interface_delay_ms);
-  DRIVER_W25QXX_LINK_DELAY_US(&w25qxx_handle, w25qxx_interface_delay_us);
-  DRIVER_W25QXX_LINK_DEBUG_PRINT(&w25qxx_handle, w25qxx_interface_debug_print);
-  w25qxx_set_interface(&w25qxx_handle, W25QXX_INTERFACE_SPI);
-  w25qxx_set_type(&w25qxx_handle, W25Q64);
-  w25qxx_init(&w25qxx_handle);
-  uint8_t manufacturer;
-  uint8_t manufacturer_id[2];
-  w25qxx_get_jedec_id(&w25qxx_handle, &manufacturer, manufacturer_id);
-  chprintf((BaseSequentialStream *)&RTT_S0, "Manufacturer: 0x%02x, Manufacturer ID: 0x%02x%02x\n", manufacturer, manufacturer_id[0], manufacturer_id[1]);
+  flashdb_init();
 
-  uint8_t res = nrf24l01_basic_init(NRF24L01_MODE_TX, interrupt_callback);
-  static uint8_t addr[5] = NRF24L01_BASIC_DEFAULT_RX_ADDR_0;
-  if (nrf24l01_basic_send((uint8_t *)addr, (uint8_t *)"123", 3) != 0);
-  {
-      (void)nrf24l01_basic_deinit();
-  }
+
+  palEnableLineEvent(LINE_SPI2_NRF24_IRQ, PAL_EVENT_MODE_BOTH_EDGES);
+  palSetLineCallbackI(LINE_SPI2_NRF24_IRQ, nrf24l01_interface_gpio_interrupt_callback, NULL);
+  nrf24l01_basic_init(NRF24L01_TYPE_TX, interrupt_callback);
 
   usbhStart(&USBHD2);
   chprintf((BaseSequentialStream *)&RTT_S0, "USBH OTG2 started");

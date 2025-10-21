@@ -5,7 +5,7 @@
 
 # Compiler options here.
 ifeq ($(USE_OPT),)
-  USE_OPT = -O -ggdb -fomit-frame-pointer -falign-functions=16
+  USE_OPT = -Os -ggdb -fomit-frame-pointer -falign-functions=16
 endif
 
 # C specific options here (added to USE_OPT).
@@ -30,7 +30,7 @@ endif
 
 # Enable this if you want link time optimizations (LTO).
 ifeq ($(USE_LTO),)
-  USE_LTO = no
+  USE_LTO = yes
 endif
 
 # Enable this if you want to see the full log while compiling.
@@ -94,6 +94,7 @@ CONFDIR  := ./cfg
 BUILDDIR := ./build
 DEPDIR   := ./.dep
 BOARDDIR := ./board
+FLASHDBDIR = ./src/flashdb
 
 # Licensing files.
 include $(CHIBIOS)/os/license/license.mk
@@ -114,6 +115,7 @@ include $(CHIBIOS)/tools/mk/autobuild.mk
 
 include $(CHIBIOS)/os/various/lwip_bindings/lwip.mk
 
+include $(FLASHDBDIR)/flashdb.mk
 # Define linker script file here
 LDSCRIPT= $(STARTUPLD)/STM32H750xB.ld
 
@@ -128,6 +130,7 @@ CSRC = $(ALLCSRC) \
        ./src/nrf24l01/nrf24l01.c \
        ./src/nrf24l01/nrf24l01_interface.c \
        ./src/nrf24l01/nrf24l01_basic.c \
+       $(CHIBIOS)/os/various/syscalls.c \
        main.c
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
@@ -159,7 +162,7 @@ CPPWARN = -Wall -Wextra -Wundef
 
 # List all user C define here, like -D_DEBUG=1
 UDEFS = -DSHELL_CMD_TEST_ENABLED=0 -DSHELL_USE_HISTORY=1 -DSHELL_USE_COMPLETION=1 -DSHELL_USE_ESC_SEQ=1 \
-        -DCHPRINTF_USE_FLOAT=1 -DTMC5160_IC_CACHE_COUNT=6
+        -DCHPRINTF_USE_FLOAT=1 -DTMC5160_IC_CACHE_COUNT=6 
 
 
 # Define ASM defines here

@@ -86,8 +86,8 @@
  #define NRF24L01_BASIC_DEFAULT_PIPE_4_DYNAMIC_PAYLOAD            NRF24L01_BOOL_TRUE                    /**< enable pipe 4 dynamic payload */
  #define NRF24L01_BASIC_DEFAULT_PIPE_5_DYNAMIC_PAYLOAD            NRF24L01_BOOL_TRUE                    /**< enable pipe 5 dynamic payload */
  #define NRF24L01_BASIC_DEFAULT_DYNAMIC_PAYLOAD                   NRF24L01_BOOL_TRUE                    /**< enable dynamic payload */
- #define NRF24L01_BASIC_DEFAULT_PAYLOAD_WITH_ACK                  NRF24L01_BOOL_FALSE                   /**< disable payload with ack */
- #define NRF24L01_BASIC_DEFAULT_TX_PAYLOAD_WITH_NO_ACK            NRF24L01_BOOL_FALSE                   /**< disable tx payload with no ack */
+ #define NRF24L01_BASIC_DEFAULT_PAYLOAD_WITH_ACK                  NRF24L01_BOOL_TRUE                    /**< disable payload with ack */
+ #define NRF24L01_BASIC_DEFAULT_TX_PAYLOAD_WITH_NO_ACK            NRF24L01_BOOL_TRUE                   /**< disable tx payload with no ack */
  #define NRF24L01_BASIC_DEFAULT_RX_ADDR_0                         {0x1A, 0x01, 0x02, 0x03, 0x00}        /**< rx address 0 */
  #define NRF24L01_BASIC_DEFAULT_RX_ADDR_1                         {0x1B, 0x01, 0x02, 0x03, 0x01}        /**< rx address 1 */
  #define NRF24L01_BASIC_DEFAULT_RX_ADDR_2                         {0x1B, 0x01, 0x02, 0x03, 0x02}        /**< rx address 2 */

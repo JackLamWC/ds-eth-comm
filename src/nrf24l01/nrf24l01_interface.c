@@ -25,13 +25,9 @@ uint8_t nrf24l01_interface_spi_init(void) {
     return 0;
 }
 
-void nrf24l01_interface_gpio_interrupt_callback(void) {
-    nrf24l01_interrupt_irq_handler();
-}
-
 uint8_t nrf24l01_interface_gpio_init(void) {
-    palEnableLineEvent(LINE_SPI2_NRF24_IRQ, PAL_EVENT_MODE_BOTH_EDGES);
-    palSetLineCallbackI(LINE_SPI2_NRF24_IRQ, nrf24l01_interface_gpio_interrupt_callback, NULL);
+    // palEnableLineEvent(LINE_SPI2_NRF24_IRQ, PAL_EVENT_MODE_BOTH_EDGES);
+    // palSetLineCallbackI(LINE_SPI2_NRF24_IRQ, nrf24l01_interface_gpio_interrupt_callback, NULL);
     return 0;
 }
 
