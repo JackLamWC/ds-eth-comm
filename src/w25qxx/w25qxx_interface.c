@@ -36,12 +36,14 @@
 
 #include "w25qxx_interface.h"
 #include <string.h>
-#include "core_cm7.h"  // For cache management functions
+#include "SEGGER_RTT_Channel.h"
+#include "ch.h"
+#include "chprintf.h"
 
 // Static buffers for DMA-compatible SPI communication
 // DMA requires memory to be in a specific region accessible to the DMA controller
 // Buffer size chosen to accommodate w25qxx operations (SFDP, security registers use 256 bytes)
-#define SPI_BUFFER_SIZE 512
+#define SPI_BUFFER_SIZE 5120
 
 
 static const SPIConfig spi_config = {
@@ -123,11 +125,13 @@ uint8_t w25qxx_interface_spi_qspi_write_read(uint8_t instruction, uint8_t instru
    if (out_buf == NULL && out_len > 0) {
        return 1;  // Error: output buffer is NULL but output length > 0
    }
-   
+
    // Buffer size validation
    if (total_len > SPI_BUFFER_SIZE) {
        return 1;  // Error: total transfer size exceeds buffer capacity
    }
+
+   memset(spi_tx_buffer, 0, SPI_BUFFER_SIZE);
    
    // Copy input data only if input buffer is valid and length > 0
    if (in_buf != NULL && in_len > 0) {

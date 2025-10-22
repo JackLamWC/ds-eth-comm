@@ -118,3 +118,35 @@ int flashdb_init()
     
     return 0;  /* 成功返回0 */
 }
+
+uint8_t flashdb_get_kv_value(const char *key, char *value, size_t value_size)
+{
+    struct fdb_blob blob;
+    fdb_kv_get_blob(&kvdb, key, fdb_blob_make(&blob, value, value_size));
+        /* the blob.saved.len is more than 0 when get the value successful */
+    if (blob.saved.len > 0) {
+        return 0;  // success
+    } else {
+        return 1;  // failed
+    }
+}
+
+uint8_t flashdb_set_kv_value(const char *key, const char *value, size_t value_size)
+{
+    struct fdb_blob blob;
+    fdb_kv_set_blob(&kvdb, key, fdb_blob_make(&blob, value, value_size));
+    if (blob.saved.len > 0) {
+        return 0;  // success
+    } else {
+        return 1;  // failed
+    }
+}
+
+uint8_t flashdb_del_kv_value(const char *key)
+{
+    if (fdb_kv_del(&kvdb, key) == FDB_NO_ERR) {
+        return 0;  // success
+    } else {
+        return 1;  // failed
+    }
+}

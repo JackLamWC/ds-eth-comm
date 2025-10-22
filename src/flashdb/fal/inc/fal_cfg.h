@@ -30,8 +30,7 @@
  /* partition table */
  #define FAL_PART_TABLE                                                               \
  {                                                                                    \
-     {FAL_PART_MAGIC_WORD,        "kvdb1",     "w25q64",         0,   2 * 1024 * 1024, 0}, \
-     {FAL_PART_MAGIC_WORD,        "tsdb",      "w25q64",         2 * 1024 * 1024,   6 * 1024 * 1024, 0}, \
+     {FAL_PART_MAGIC_WORD,        "kvdb1",     "w25q64",         0,   4 * 1024 * 1024, 0} \
  }
  #endif /* FAL_PART_HAS_TABLE_CFG */
  

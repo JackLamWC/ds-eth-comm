@@ -537,6 +537,12 @@ int main(void) {
   chThdCreateStatic(waUsbHost, sizeof(waUsbHost), NORMALPRIO+2, UsbHostThread, NULL);
 
   flashdb_init();
+  char boot_count = 0;
+  flashdb_get_kv_value("boot_count", &boot_count, sizeof(boot_count));
+  boot_count++;
+  flashdb_set_kv_value("boot_count", &boot_count, sizeof(boot_count));
+  chprintf((BaseSequentialStream *)&RTT_S0, "Boot count: %d\n", boot_count);
+  
 
 
   palEnableLineEvent(LINE_SPI2_NRF24_IRQ, PAL_EVENT_MODE_BOTH_EDGES);
