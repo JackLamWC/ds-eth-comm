@@ -120,7 +120,6 @@
 #define GPIOC_OSC32_IN              14U
 #define GPIOC_OSC32_OUT             15U
 
-#define GPIOD_SDRAM_D2              0U
 #define GPIOD_NRF24_CE              0U
 #define GPIOD_SDRAM_D3              1U
 #define GPIOD_SPI2_NRF24_IRQ        1U
@@ -298,7 +297,6 @@
 #define LINE_BUTTON                 PAL_LINE(GPIOC, 13U)
 #define LINE_OSC32_IN               PAL_LINE(GPIOC, 14U)
 #define LINE_OSC32_OUT              PAL_LINE(GPIOC, 15U)
-#define LINE_SDRAM_D2               PAL_LINE(GPIOD, 0U)
 #define LINE_SPI2_NRF24_CE          PAL_LINE(GPIOD, 0U)
 #define LINE_SDRAM_D3               PAL_LINE(GPIOD, 1U)
 #define LINE_SPI2_NRF24_IRQ         PAL_LINE(GPIOD, 1U)
@@ -855,8 +853,8 @@
                                      PIN_OSPEED_HIGH(GPIOD_I2C4_SDA) |      \
                                      PIN_OSPEED_HIGH(GPIOD_SDRAM_D0) |      \
                                      PIN_OSPEED_HIGH(GPIOD_SDRAM_D1))
-#define VAL_GPIOD_PUPDR             (PIN_PUPDR_PULLUP(GPIOD_NRF24_CE) |     \
-                                     PIN_PUPDR_PULLUP(GPIOD_SPI2_NRF24_IRQ) |   \
+#define VAL_GPIOD_PUPDR             (PIN_PUPDR_PULLDOWN(GPIOD_NRF24_CE) |     \
+                                     PIN_PUPDR_FLOATING(GPIOD_SPI2_NRF24_IRQ) |   \
                                      PIN_PUPDR_FLOATING(GPIOD_SDIO1_CMD) |  \
                                      PIN_PUPDR_PULLUP(GPIOD_SPI_FLASH_CS) |       \
                                      PIN_PUPDR_FLOATING(GPIOD_PIN4) |       \

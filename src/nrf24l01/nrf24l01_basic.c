@@ -140,7 +140,7 @@
      }
      
      /* enable max rt */
-     res = nrf24l01_set_config(&gs_handle, NRF24L01_CONFIG_MASK_MAX_RT, NRF24L01_BOOL_TRUE);
+     res = nrf24l01_set_config(&gs_handle, NRF24L01_CONFIG_MASK_MAX_RT, NRF24L01_BOOL_FALSE);
      if (res != 0)
      {
          nrf24l01_interface_debug_print("nrf24l01: set config failed.\n");
@@ -150,7 +150,7 @@
      }
      
      /* enable tx ds */
-     res = nrf24l01_set_config(&gs_handle, NRF24L01_CONFIG_MASK_TX_DS, NRF24L01_BOOL_TRUE);
+     res = nrf24l01_set_config(&gs_handle, NRF24L01_CONFIG_MASK_TX_DS, NRF24L01_BOOL_FALSE);
      if (res != 0)
      {
          nrf24l01_interface_debug_print("nrf24l01: set config failed.\n");
@@ -160,7 +160,7 @@
      }
      
      /* enable rx dr */
-     res = nrf24l01_set_config(&gs_handle, NRF24L01_CONFIG_MASK_RX_DR, NRF24L01_BOOL_TRUE);
+     res = nrf24l01_set_config(&gs_handle, NRF24L01_CONFIG_MASK_RX_DR, NRF24L01_BOOL_FALSE);
      if (res != 0)
      {
          nrf24l01_interface_debug_print("nrf24l01: set config failed.\n");
@@ -594,65 +594,65 @@
          return 1;
      }
      
-    //  /* set rx pipe 0 address */
-    //  res = nrf24l01_set_rx_pipe_0_address(&gs_handle, (uint8_t *)addr0, NRF24L01_BASIC_DEFAULT_ADDRESS_WIDTH + 2);
-    //  if (res != 0)
-    //  {
-    //      nrf24l01_interface_debug_print("nrf24l01: set rx pipe 0 address failed.\n");
-    //      (void)nrf24l01_deinit(&gs_handle);
+     /* set rx pipe 0 address */
+     res = nrf24l01_set_rx_pipe_0_address(&gs_handle, (uint8_t *)addr0, NRF24L01_BASIC_DEFAULT_ADDRESS_WIDTH + 2);
+     if (res != 0)
+     {
+         nrf24l01_interface_debug_print("nrf24l01: set rx pipe 0 address failed.\n");
+         (void)nrf24l01_deinit(&gs_handle);
          
-    //      return 1;
-    //  }
+         return 1;
+     }
      
-    //  /* set rx pipe 1 address */
-    //  res = nrf24l01_set_rx_pipe_1_address(&gs_handle, (uint8_t *)addr1, NRF24L01_BASIC_DEFAULT_ADDRESS_WIDTH + 2);
-    //  if (res != 0)
-    //  {
-    //      nrf24l01_interface_debug_print("nrf24l01: set rx pipe 1 address failed.\n");
-    //      (void)nrf24l01_deinit(&gs_handle);
+     /* set rx pipe 1 address */
+     res = nrf24l01_set_rx_pipe_1_address(&gs_handle, (uint8_t *)addr1, NRF24L01_BASIC_DEFAULT_ADDRESS_WIDTH + 2);
+     if (res != 0)
+     {
+         nrf24l01_interface_debug_print("nrf24l01: set rx pipe 1 address failed.\n");
+         (void)nrf24l01_deinit(&gs_handle);
          
-    //      return 1;
-    //  }
+         return 1;
+     }
      
-    //  /* set rx pipe 2 address */
-    //  res = nrf24l01_set_rx_pipe_2_address(&gs_handle, addr2[4]);
-    //  if (res != 0)
-    //  {
-    //      nrf24l01_interface_debug_print("nrf24l01: set rx pipe 2 address failed.\n");
-    //      (void)nrf24l01_deinit(&gs_handle);
+     /* set rx pipe 2 address */
+     res = nrf24l01_set_rx_pipe_2_address(&gs_handle, addr2[4]);
+     if (res != 0)
+     {
+         nrf24l01_interface_debug_print("nrf24l01: set rx pipe 2 address failed.\n");
+         (void)nrf24l01_deinit(&gs_handle);
          
-    //      return 1;
-    //  }
+         return 1;
+     }
      
-    //  /* set rx pipe 3 address */
-    //  res = nrf24l01_set_rx_pipe_3_address(&gs_handle, addr3[4]);
-    //  if (res != 0)
-    //  {
-    //      nrf24l01_interface_debug_print("nrf24l01: set rx pipe 3 address failed.\n");
-    //      (void)nrf24l01_deinit(&gs_handle);
+     /* set rx pipe 3 address */
+     res = nrf24l01_set_rx_pipe_3_address(&gs_handle, addr3[4]);
+     if (res != 0)
+     {
+         nrf24l01_interface_debug_print("nrf24l01: set rx pipe 3 address failed.\n");
+         (void)nrf24l01_deinit(&gs_handle);
          
-    //      return 1;
-    //  }
+         return 1;
+     }
      
-    //  /* set rx pipe 4 address */
-    //  res = nrf24l01_set_rx_pipe_4_address(&gs_handle, addr4[4]);
-    //  if (res != 0)
-    //  {
-    //      nrf24l01_interface_debug_print("nrf24l01: set rx pipe 4 address failed.\n");
-    //      (void)nrf24l01_deinit(&gs_handle);
+     /* set rx pipe 4 address */
+     res = nrf24l01_set_rx_pipe_4_address(&gs_handle, addr4[4]);
+     if (res != 0)
+     {
+         nrf24l01_interface_debug_print("nrf24l01: set rx pipe 4 address failed.\n");
+         (void)nrf24l01_deinit(&gs_handle);
          
-    //      return 1;
-    //  }
+         return 1;
+     }
      
-    //  /* set rx pipe 5 address */
-    //  res = nrf24l01_set_rx_pipe_5_address(&gs_handle, addr5[4]);
-    //  if (res != 0)
-    //  {
-    //      nrf24l01_interface_debug_print("nrf24l01: set rx pipe 5 address failed.\n");
-    //      (void)nrf24l01_deinit(&gs_handle);
+     /* set rx pipe 5 address */
+     res = nrf24l01_set_rx_pipe_5_address(&gs_handle, addr5[4]);
+     if (res != 0)
+     {
+         nrf24l01_interface_debug_print("nrf24l01: set rx pipe 5 address failed.\n");
+         (void)nrf24l01_deinit(&gs_handle);
          
-    //      return 1;
-    //  }
+         return 1;
+     }
      
      /* flush tx */
      res = nrf24l01_flush_tx(&gs_handle);
@@ -706,17 +706,18 @@
      }
  }
  
- /**
-  * @brief     basic example send
-  * @param[in] *addr pointer to a address buffer
-  * @param[in] *buf pointer to a data buffer
-  * @param[in] len buffer length
-  * @return    status code
-  *            - 0 success
-  *            - 1 send failed
-  * @note      none
-  */
- uint8_t nrf24l01_basic_send(uint8_t *addr, uint8_t *buf, uint8_t len)
+/**
+ * @brief     basic example send
+ * @param[in] *addr pointer to a address buffer
+ * @param[in] *buf pointer to a data buffer
+ * @param[in] len buffer length
+ * @param[in] use_ack enable or disable acknowledgment
+ * @return    status code
+ *            - 0 success
+ *            - 1 send failed
+ * @note      none
+ */
+uint8_t nrf24l01_basic_send(uint8_t *addr, uint8_t *buf, uint8_t len, nrf24l01_bool_t use_ack)
  {
      uint8_t res;
      
@@ -724,6 +725,7 @@
      res = nrf24l01_set_active(&gs_handle, NRF24L01_BOOL_FALSE);
      if (res != 0)
      {
+         nrf24l01_interface_debug_print("nrf24l01: set active failed. with %d\n", res);
          return 1;
      }
      
@@ -731,18 +733,20 @@
      res = nrf24l01_set_tx_address(&gs_handle, (uint8_t *)addr, NRF24L01_BASIC_DEFAULT_ADDRESS_WIDTH + 2);
      if (res != 0)
      {
-         return 1;
+         nrf24l01_interface_debug_print("nrf24l01: set tx address failed. with %d\n", res);
+         return 2;
      }
      
      /* set rx pipe 0 address */
      res = nrf24l01_set_rx_pipe_0_address(&gs_handle, (uint8_t *)addr, NRF24L01_BASIC_DEFAULT_ADDRESS_WIDTH + 2);
      if (res != 0)
      {
-         return 1;
+         nrf24l01_interface_debug_print("nrf24l01: set rx pipe 0 address failed. with %d\n", res);
+         return 3;
      }
      
-     /* send data */
-     res = nrf24l01_write_payload_with_no_ack(&gs_handle, (uint8_t *)buf, len);
+    /* send data */
+    res = nrf24l01_send(&gs_handle, (uint8_t *)buf, len, use_ack);
      if (res != 0)
      {
          return 1;

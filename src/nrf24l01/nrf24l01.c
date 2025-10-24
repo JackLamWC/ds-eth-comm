@@ -333,95 +333,128 @@
      return 0;                                                         /* success return 0 */
  }
  
- /**
-  * @brief     send data
-  * @param[in] *handle pointer to an nrf24l01 handle structure
-  * @param[in] *buf pointer to a data buffer
-  * @param[in] len buffer length
-  * @return    status code
-  *            - 0 success
-  *            - 1 send failed
-  *            - 2 handle is NULL
-  *            - 3 handle is not initialized
-  *            - 4 len is over 32
-  *            - 5 send timeout
-  * @note      none
-  */
- uint8_t nrf24l01_send(nrf24l01_handle_t *handle, uint8_t *buf, uint8_t len)
- {
-     uint8_t res;
-     uint8_t i;
-     uint8_t k;
-     uint8_t tmp;
-     uint8_t buffer[32];
-     uint32_t timeout;
-     
-     if (handle == NULL)                                                                    /* check handle */
-     {
-         return 2;                                                                          /* return error */
-     }
-     if (handle->inited != 1)                                                               /* check handle initialization */
-     {
-         return 3;                                                                          /* return error */
-     }
-     if (len > 32)                                                                          /* check the result */
-     {
-         handle->debug_print("nrf24l01: len is over 32.\n");                                /* len is over 32 */
+/**
+ * @brief     send data
+ * @param[in] *handle pointer to an nrf24l01 handle structure
+ * @param[in] *buf pointer to a data buffer
+ * @param[in] len buffer length
+ * @param[in] use_ack enable or disable acknowledgment
+ * @return    status code
+ *            - 0 success
+ *            - 1 send failed
+ *            - 2 handle is NULL
+ *            - 3 handle is not initialized
+ *            - 4 len is over 32
+ *            - 5 send timeout
+ * @note      none
+ */
+uint8_t nrf24l01_send(nrf24l01_handle_t *handle, uint8_t *buf, uint8_t len, nrf24l01_bool_t use_ack)
+{
+    uint8_t res;
+    uint8_t i;
+    uint8_t k;
+    uint8_t tmp;
+    uint8_t buffer[32];
+    uint32_t timeout;
+    uint8_t command;
+    
+    if (handle == NULL)                                                                    /* check handle */
+    {
+        return 2;                                                                          /* return error */
+    }
+    if (handle->inited != 1)                                                               /* check handle initialization */
+    {
+        return 3;                                                                          /* return error */
+    }
+    if (len > 32)                                                                          /* check the result */
+    {
+        handle->debug_print("nrf24l01: len is over 32.\n");                                /* len is over 32 */
         
-         return 4;                                                                          /* return error */
-     }
- 
-     memcpy((uint8_t *)buffer, buf, len);                                                   /* copy the data */
-     k = len / 2;                                                                           /* get the half */
-     for (i = 0; i < k; i++)                                                                /* run k times */
-     {
-         tmp = buffer[i];                                                                   /* copy to tmp */
-         buffer[i] = buffer[len - 1 - i];                                                   /* buffer[i] = buffer[n - 1 - i] */
-         buffer[len - 1 - i] = tmp;                                                         /* set buffer[n - 1 - i]*/
-     }
-     handle->finished = 0;                                                                  /* clear finished */
-     if (handle->gpio_write(0) != 0)                                                        /* gpio write */
-     {
-         handle->debug_print("nrf24l01: gpio write failed.\n");                             /* gpio write failed */
+        return 4;                                                                          /* return error */
+    }
+
+    memcpy((uint8_t *)buffer, buf, len);                                                   /* copy the data */
+    k = len / 2;                                                                           /* get the half */
+    for (i = 0; i < k; i++)                                                                /* run k times */
+    {
+        tmp = buffer[i];                                                                   /* copy to tmp */
+        buffer[i] = buffer[len - 1 - i];                                                   /* buffer[i] = buffer[n - 1 - i] */
+        buffer[len - 1 - i] = tmp;                                                         /* set buffer[n - 1 - i]*/
+    }
+    
+    /* select command based on ACK setting */
+    if (use_ack == NRF24L01_BOOL_TRUE)
+    {
+        command = NRF24L01_COMMAND_W_TX_PAYLOAD;                                            /* use normal tx payload with ack */
+    }
+    else
+    {
+        command = NRF24L01_COMMAND_W_TX_PAYLOAD_NO_ACK;                                     /* use tx payload without ack */
+    }
+    
+    handle->finished = 0;                                                                  /* clear finished */
+    if (handle->gpio_write(0) != 0)                                                        /* gpio write */
+    {
+        handle->debug_print("nrf24l01: gpio write failed.\n");                             /* gpio write failed */
         
-         return 1;                                                                          /* return error */
-     }
-     res = handle->spi_write(NRF24L01_COMMAND_W_TX_PAYLOAD, (uint8_t *)buffer, len);        /* set tx payload */
-     if (res != 0)                                                                          /* check result */
-     {
-         handle->debug_print("nrf24l01: set tx payload failed.\n");                         /* set tx payload failed */
+        return 1;                                                                          /* return error */
+    }
+    res = handle->spi_write(command, (uint8_t *)buffer, len);                              /* set tx payload */
+    if (res != 0)                                                                          /* check result */
+    {
+        handle->debug_print("nrf24l01: set tx payload failed.\n");                         /* set tx payload failed */
         
-         return 1;                                                                          /* return error */
-     }
-     if (handle->gpio_write(1) != 0)                                                        /* gpio write */
-     {
-         handle->debug_print("nrf24l01: gpio write failed.\n");                             /* gpio write failed */
+        return 1;                                                                          /* return error */
+    }
+    if (handle->gpio_write(1) != 0)                                                        /* gpio write */
+    {
+        handle->debug_print("nrf24l01: gpio write failed.\n");                             /* gpio write failed */
         
-         return 1;                                                                          /* return error */
-     }
-     timeout = 5000;                                                                        /* set timeout */
-     while ((timeout != 0) && (handle->finished == 0))                                      /* wait time */
-     {
-         handle->delay_ms(1);                                                               /* delay 1 ms */
-         timeout--;                                                                         /* timeout-- */
-     }
-     if (timeout == 0)                                                                      /* check timeout */
-     {
-         handle->debug_print("nrf24l01: send timeout.\n");                                  /* send timeout failed */
-        
-         return 5;                                                                          /* return error */
-     }
-     if (handle->finished == 1)                                                             /* check finished */
-     {
-         return 0;                                                                          /* success return 0 */
-     }
-     else
-     {
-         handle->debug_print("nrf24l01: send failed.\n");                                   /* send failed */
-        
-         return 1;                                                                          /* return error */
-     }
- }
+        return 1;                                                                          /* return error */
+    }
+
+    uint8_t feature;
+    res = a_nrf24l01_spi_read(handle, NRF24L01_REG_FEATURE, (uint8_t *)&feature, 1);
+    handle->debug_print("nrf24l01: feature: %d\n", feature);    
+    
+    /* only wait for completion if using ACK */
+    if (use_ack == NRF24L01_BOOL_TRUE)
+    {
+        timeout = 5000;                                                                    /* set timeout */
+        while ((timeout != 0) && (handle->finished == 0))                                  /* wait time */
+        {
+            handle->delay_ms(1);                                                           /* delay 1 ms */
+            timeout--;                                                                     /* timeout-- */
+        }
+        if (timeout == 0)                                                                  /* check timeout */
+        {
+            uint8_t status;
+            res = a_nrf24l01_spi_read(handle, NRF24L01_REG_STATUS, (uint8_t *)&status, 1);
+            handle->debug_print("nrf24l01: status: %d\n", status);
+            uint8_t config;
+            res = a_nrf24l01_spi_read(handle, NRF24L01_REG_CONFIG, (uint8_t *)&config, 1);
+            handle->debug_print("nrf24l01: config: %d\n", config);
+            handle->debug_print("nrf24l01: send timeout.\n");                              /* send timeout failed */
+            
+            return 5;                                                                      /* return error */
+        }
+        if (handle->finished == 1)                                                         /* check finished */
+        {
+            return 0;                                                                      /* success return 0 */
+        }
+        else
+        {
+            handle->debug_print("nrf24l01: send failed.\n");                               /* send failed */
+            
+            return 1;                                                                      /* return error */
+        }
+    }
+    else
+    {
+        /* for no-ACK mode, just return success immediately */
+        return 0;                                                                          /* success return 0 */
+    }
+}
  
  /**
   * @brief     irq handler
@@ -928,7 +961,6 @@
         
          return 1;                                                                        /* return error */
      }
-     prev = 0x00;
      prev &= ~(3 << 0);                                                                   /* clear config */
      prev |= width << 0;                                                                  /* set width */
      res = a_nrf24l01_spi_write(handle, NRF24L01_REG_SETUP_AW, (uint8_t *)&prev, 1);      /* set setup of address widths */

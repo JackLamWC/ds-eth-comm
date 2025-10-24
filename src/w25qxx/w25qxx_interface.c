@@ -43,7 +43,8 @@
 // Static buffers for DMA-compatible SPI communication
 // DMA requires memory to be in a specific region accessible to the DMA controller
 // Buffer size chosen to accommodate w25qxx operations (SFDP, security registers use 256 bytes)
-#define SPI_BUFFER_SIZE 5120
+// Most operations are 1-4 bytes, with SFDP/security registers up to 256 bytes
+#define SPI_BUFFER_SIZE 64
 
 
 static const SPIConfig spi_config = {

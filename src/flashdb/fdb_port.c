@@ -56,6 +56,7 @@ static int w25q_init(void) {
 
 static int w25q_read(long addr, uint8_t *buf, size_t size)
 {
+    chprintf((BaseSequentialStream *)&RTT_S0, "w25q_read: addr: %ld, size: %ld\n", addr, size);
     w25qxx_read(&w25qxx_handle, addr, buf, size);
     return 0;
 }
@@ -63,6 +64,7 @@ static int w25q_read(long addr, uint8_t *buf, size_t size)
 
 static int w25q_write(long addr, const uint8_t *buf, size_t size)
 {
+    chprintf((BaseSequentialStream *)&RTT_S0, "w25q_write: addr: %ld, size: %ld\n", addr, size);
     w25qxx_write(&w25qxx_handle, addr, (uint8_t*)buf, size); 
     return 0;
 }
@@ -97,17 +99,12 @@ int flashdb_init()
 
     w25q_init();
 
-    chThdSleepMilliseconds(1000);
+    fdb_kvdb_control(&kvdb, FDB_KVDB_CTRL_SET_LOCK, (void *)fdb_lock);
+    fdb_kvdb_control(&kvdb, FDB_KVDB_CTRL_SET_UNLOCK, (void *)fdb_unlock);
     
     /* 初始化KVDB：参数依次是KVDB对象、Flash名、分区名、默认KV、用户数据 */
     result = fdb_kvdb_init(&kvdb, "w25q64", "kvdb1", &default_kv, NULL);
     
-    /* 设置锁函数和解锁函数 */
-    if (result == FDB_NO_ERR) {
-        fdb_kvdb_control(&kvdb, FDB_KVDB_CTRL_SET_LOCK, (void *)fdb_lock);
-        fdb_kvdb_control(&kvdb, FDB_KVDB_CTRL_SET_UNLOCK, (void *)fdb_unlock);
-    }
-
     /* 检查初始化结果 */
     if (result != FDB_NO_ERR) {
         chprintf((BaseSequentialStream *)&RTT_S0, "KVDB init failed! Error code: %d\n", result);

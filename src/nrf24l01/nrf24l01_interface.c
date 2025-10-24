@@ -4,7 +4,7 @@
 #include "hal.h"
 #include <string.h>
 
-#define SPI_BUFFER_SIZE 64
+#define SPI_BUFFER_SIZE 34
 
 static SPIConfig nrf24l01_spi_config = {
     .circular = false,
@@ -13,7 +13,7 @@ static SPIConfig nrf24l01_spi_config = {
     .data_cb = NULL,
     .error_cb = NULL,
     .cfg1 = SPI_CFG1_MBR_1 | SPI_CFG1_MBR_2 | SPI_CFG1_MBR_0| SPI_CFG1_DSIZE_8BITS,
-    .cfg2 = SPI_CFG2_CPHA
+    // .cfg2 = 
 };
 
 uint8_t nrf24l01_interface_spi_init(void) {
@@ -32,9 +32,6 @@ uint8_t nrf24l01_interface_gpio_init(void) {
 }
 
 uint8_t nrf24l01_interface_spi_deinit(void) {
-    spiStop(&SPID2);
-    palDisableLineEvent(LINE_SPI2_NRF24_IRQ);
-    palSetLineCallbackI(LINE_SPI2_NRF24_IRQ, NULL, NULL);
     return 0;
 }
 

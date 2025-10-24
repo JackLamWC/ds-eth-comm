@@ -363,7 +363,7 @@
   *            - 5 send timeout
   * @note      none
   */
- uint8_t nrf24l01_send(nrf24l01_handle_t *handle, uint8_t *buf, uint8_t len);
+ uint8_t nrf24l01_send(nrf24l01_handle_t *handle, uint8_t *buf, uint8_t len, nrf24l01_bool_t use_ack);
  
  /**
   * @brief     enable or disable the chip

@@ -70,7 +70,7 @@
  #define NRF24L01_BASIC_DEFAULT_ADDRESS_WIDTH                     NRF24L01_ADDRESS_WIDTH_5_BYTES        /**< set 5 bytes width */
  #define NRF24L01_BASIC_DEFAULT_RETRANSMIT_DELAY                  750                                   /**< 750 us */
  #define NRF24L01_BASIC_DEFAULT_RETRANSMIT_COUNT                  10                                    /**< 10 times */
- #define NRF24L01_BASIC_DEFAULT_CHANNEL_FREQUENCY                 20                                    /**< 20 MHz */
+ #define NRF24L01_BASIC_DEFAULT_CHANNEL_FREQUENCY                 94                                    /**< 20 MHz */
  #define NRF24L01_BASIC_DEFAULT_DATA_RATE                         NRF24L01_DATA_RATE_2M                 /**< 2M */
  #define NRF24L01_BASIC_DEFAULT_OUTPUT_POWER                      NRF24L01_OUTPUT_POWER_0_DBM           /**< 0dBm */
  #define NRF24L01_BASIC_DEFAULT_PIPE_0_PAYLOAD                    32                                    /**< 32 bytes */
@@ -86,7 +86,7 @@
  #define NRF24L01_BASIC_DEFAULT_PIPE_4_DYNAMIC_PAYLOAD            NRF24L01_BOOL_TRUE                    /**< enable pipe 4 dynamic payload */
  #define NRF24L01_BASIC_DEFAULT_PIPE_5_DYNAMIC_PAYLOAD            NRF24L01_BOOL_TRUE                    /**< enable pipe 5 dynamic payload */
  #define NRF24L01_BASIC_DEFAULT_DYNAMIC_PAYLOAD                   NRF24L01_BOOL_TRUE                    /**< enable dynamic payload */
- #define NRF24L01_BASIC_DEFAULT_PAYLOAD_WITH_ACK                  NRF24L01_BOOL_TRUE                    /**< disable payload with ack */
+ #define NRF24L01_BASIC_DEFAULT_PAYLOAD_WITH_ACK                  NRF24L01_BOOL_TRUE                   /**< disable payload with ack */
  #define NRF24L01_BASIC_DEFAULT_TX_PAYLOAD_WITH_NO_ACK            NRF24L01_BOOL_TRUE                   /**< disable tx payload with no ack */
  #define NRF24L01_BASIC_DEFAULT_RX_ADDR_0                         {0x1A, 0x01, 0x02, 0x03, 0x00}        /**< rx address 0 */
  #define NRF24L01_BASIC_DEFAULT_RX_ADDR_1                         {0x1B, 0x01, 0x02, 0x03, 0x01}        /**< rx address 1 */
@@ -133,17 +133,18 @@
   */
  uint8_t nrf24l01_basic_deinit(void);
  
- /**
-  * @brief     basic example send
-  * @param[in] *addr pointer to a address buffer
-  * @param[in] *buf pointer to a data buffer
-  * @param[in] len buffer length
-  * @return    status code
-  *            - 0 success
-  *            - 1 send failed
-  * @note      none
-  */
- uint8_t nrf24l01_basic_send(uint8_t *addr, uint8_t *buf, uint8_t len);
+/**
+ * @brief     basic example send
+ * @param[in] *addr pointer to a address buffer
+ * @param[in] *buf pointer to a data buffer
+ * @param[in] len buffer length
+ * @param[in] use_ack enable or disable acknowledgment
+ * @return    status code
+ *            - 0 success
+ *            - 1 send failed
+ * @note      none
+ */
+uint8_t nrf24l01_basic_send(uint8_t *addr, uint8_t *buf, uint8_t len, nrf24l01_bool_t use_ack);
  
  /**
   * @}
