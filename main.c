@@ -21,7 +21,7 @@
 
 
 /* FlashDB */
-#include "fdb_port.h"
+// #include "fdb_port.h"
 
 /* lwIP Network Stack */
 #include "lwipthread.h"
@@ -37,7 +37,7 @@
 #include "usbh/debug.h"
 
 /* Hardware Drivers */
-#include "w25qxx_interface.h"
+// #include "w25qxx_interface.h"
 #include "nrf24l01.h"
 #include "nrf24l01_interface.h"
 #include "nrf24l01_basic.h"
@@ -86,6 +86,35 @@ const uint8_t PS5_BUTTONS[] = {
  * GLOBAL VARIABLES AND CONSTANTS
  * ============================================================================ */
 
+/* Thread Monitoring Configuration */
+#define MAX_MONITORED_THREADS 10
+#define MONITOR_DISPLAY_INTERVAL_MS 5000  // Display every 5 seconds
+
+/* Thread monitoring structure */
+typedef struct {
+    const char* name;
+    thread_t* thread_ptr;
+    systime_t last_loop_time;
+    systime_t current_loop_time;
+    systime_t loop_duration;
+    uint32_t loop_count;
+    systime_t min_loop_time;
+    systime_t max_loop_time;
+    systime_t total_loop_time;
+    systime_t first_loop_time;        // Time of first loop for frequency calculation
+    systime_t last_wake_time;         // Time of last wake-up for frequency calculation
+    uint32_t wake_count;              // Number of wake-ups
+    bool is_active;
+} thread_monitor_t;
+
+/* Global thread monitoring data */
+static thread_monitor_t thread_monitors[MAX_MONITORED_THREADS];
+static uint8_t monitor_count = 0;
+
+/* Forward declarations for thread monitoring functions */
+static bool register_thread_monitor(const char* name, thread_t* thread_ptr);
+static void update_thread_loop_start(const char* name);
+static void update_thread_loop_end(const char* name);
 
 /* Network Configuration */
 #define UDP_SERVER_PORT    12345
@@ -96,7 +125,7 @@ const uint8_t PS5_BUTTONS[] = {
 /* Shell Configuration */
 char shell_history[SHELL_MAX_HIST_BUFF];
 char *shell_completions[SHELL_MAX_COMPLETIONS];
-#define SHELL_WA_SIZE THD_WORKING_AREA_SIZE(128)
+#define SHELL_WA_SIZE THD_WORKING_AREA_SIZE(1024)
 
 /* ============================================================================
  * DUALSENSE CONTROLLER STRUCTURES AND ENUMS
@@ -376,13 +405,13 @@ static void interrupt_callback(uint8_t type, uint8_t num, uint8_t *buf, uint8_t 
         }
         case NRF24L01_INTERRUPT_TX_DS :
         {
-            nrf24l01_interface_debug_print("nrf24l01: irq send ok.\n");
+            // nrf24l01_interface_debug_print("nrf24l01: irq send ok.\n");
             
             break;
         }
         case NRF24L01_INTERRUPT_MAX_RT :
         {
-            nrf24l01_interface_debug_print("nrf24l01: irq reach max retry times.\n");
+            // nrf24l01_interface_debug_print("nrf24l01: irq reach max retry times.\n");
             
             break;
         }
@@ -406,7 +435,7 @@ static event_source_t esNRF24Interrupt;
 static event_listener_t nrf24_interrupt_listener;
 
 // Working area for NRF24L01 interrupt thread
-static THD_WORKING_AREA(waNRF24Interrupt, 128);
+static THD_WORKING_AREA(waNRF24Interrupt, 2048);
 
 // NRF24L01 interrupt handling thread
 static THD_FUNCTION(NRF24InterruptThread, arg) {
@@ -418,6 +447,8 @@ static THD_FUNCTION(NRF24InterruptThread, arg) {
   chEvtRegisterMask(&esNRF24Interrupt, &nrf24_interrupt_listener, EVT_NRF24_INTERRUPT);
   
   while (true) {
+    update_thread_loop_start("nrf24_irq");
+    
     // Wait for interrupt event
     eventmask_t evt = chEvtWaitOne(EVT_NRF24_INTERRUPT);
     
@@ -429,9 +460,11 @@ static THD_FUNCTION(NRF24InterruptThread, arg) {
         nrf24l01_interface_debug_print("nrf24l01: interrupt handler failed with code %d\n", result);
       }
       else {
-        chprintf((BaseSequentialStream *)&RTT_S0, "nrf24l01: interrupt handler success\n");
+        // chprintf((BaseSequentialStream *)&RTT_S0, "nrf24l01: interrupt handler success\n");
       }
     }
+    
+    update_thread_loop_end("nrf24_irq");
   }
 }
 
@@ -444,6 +477,137 @@ void nrf24l01_interface_gpio_interrupt_callback(void *args) {
 
 
 /* ============================================================================
+ * THREAD MONITORING FUNCTIONS
+ * ============================================================================ */
+
+/* Register a thread for monitoring */
+static bool register_thread_monitor(const char* name, thread_t* thread_ptr) {
+    if (monitor_count >= MAX_MONITORED_THREADS) {
+        return false;
+    }
+    
+    thread_monitor_t* monitor = &thread_monitors[monitor_count];
+    monitor->name = name;
+    monitor->thread_ptr = thread_ptr;
+    monitor->last_loop_time = chVTGetSystemTime();
+    monitor->current_loop_time = monitor->last_loop_time;
+    monitor->loop_duration = 0;
+    monitor->loop_count = 0;
+    monitor->min_loop_time = 0xFFFFFFFF;
+    monitor->max_loop_time = 0;
+    monitor->total_loop_time = 0;
+    monitor->first_loop_time = 0;
+    monitor->last_wake_time = 0;
+    monitor->wake_count = 0;
+    monitor->is_active = true;
+    
+    monitor_count++;
+    return true;
+}
+
+/* Update thread loop timing - call this at the start of each thread loop */
+static void update_thread_loop_start(const char* name) {
+    systime_t now = chVTGetSystemTime();
+    
+    for (uint8_t i = 0; i < monitor_count; i++) {
+        if (thread_monitors[i].is_active && 
+            strcmp(thread_monitors[i].name, name) == 0) {
+            thread_monitor_t* monitor = &thread_monitors[i];
+            
+            monitor->current_loop_time = now;
+            
+            // Track wake-up frequency
+            monitor->wake_count++;
+            if (monitor->first_loop_time == 0) {
+                monitor->first_loop_time = now;
+            }
+            monitor->last_wake_time = now;
+            
+            break;
+        }
+    }
+}
+
+/* Update thread loop timing - call this at the end of each thread loop */
+static void update_thread_loop_end(const char* name) {
+    systime_t now = chVTGetSystemTime();
+    
+    for (uint8_t i = 0; i < monitor_count; i++) {
+        if (thread_monitors[i].is_active && 
+            strcmp(thread_monitors[i].name, name) == 0) {
+            thread_monitor_t* monitor = &thread_monitors[i];
+            
+            // Calculate loop duration
+            monitor->loop_duration = now - monitor->current_loop_time;
+            
+            // Update statistics
+            monitor->loop_count++;
+            monitor->total_loop_time += monitor->loop_duration;
+            
+            if (monitor->loop_duration < monitor->min_loop_time) {
+                monitor->min_loop_time = monitor->loop_duration;
+            }
+            if (monitor->loop_duration > monitor->max_loop_time) {
+                monitor->max_loop_time = monitor->loop_duration;
+            }
+            
+            monitor->last_loop_time = now;
+            break;
+        }
+    }
+}
+
+/* Thread Monitor Display Thread */
+static THD_WORKING_AREA(waThreadMonitor, 1024);
+static THD_FUNCTION(ThreadMonitor, arg) {
+    (void)arg;
+    chRegSetThreadName("thread_monitor");
+    
+    chprintf((BaseSequentialStream *)&RTT_S0, "Thread Monitor started\n");
+    
+    while (true) {
+        chThdSleepMilliseconds(MONITOR_DISPLAY_INTERVAL_MS);
+        
+        chprintf((BaseSequentialStream *)&RTT_S0, "\n=== THREAD LOOP TIME & FREQUENCY STATISTICS ===\n");
+        chprintf((BaseSequentialStream *)&RTT_S0, "Thread Name        | Loops | Avg(ms) | Min(ms) | Max(ms) | Last(ms) | Freq(Hz)\n");
+        chprintf((BaseSequentialStream *)&RTT_S0, "-------------------|-------|---------|---------|---------|---------|--------\n");
+        
+        for (uint8_t i = 0; i < monitor_count; i++) {
+            if (thread_monitors[i].is_active) {
+                thread_monitor_t* monitor = &thread_monitors[i];
+                systime_t avg_loop_time = 0;
+                float frequency_hz = 0.0f;
+                
+                if (monitor->loop_count > 0) {
+                    avg_loop_time = monitor->total_loop_time / monitor->loop_count;
+                }
+                
+                // Calculate frequency based on wake-up count and time elapsed
+                if (monitor->wake_count > 1 && monitor->first_loop_time > 0) {
+                    systime_t total_time = monitor->last_wake_time - monitor->first_loop_time;
+                    if (total_time > 0) {
+                        // Convert to frequency: wake_count / (total_time_in_seconds)
+                        frequency_hz = (float)monitor->wake_count / ((float)TIME_I2MS(total_time) / 1000.0f);
+                    }
+                }
+                
+                chprintf((BaseSequentialStream *)&RTT_S0, 
+                    "%-18s | %5lu | %7lu | %7lu | %7lu | %7lu | %6.1f\n",
+                    monitor->name,
+                    (unsigned long)monitor->loop_count,
+                    (unsigned long)TIME_I2MS(avg_loop_time),
+                    (unsigned long)TIME_I2MS(monitor->min_loop_time),
+                    (unsigned long)TIME_I2MS(monitor->max_loop_time),
+                    (unsigned long)TIME_I2MS(monitor->loop_duration),
+                    frequency_hz
+                );
+            }
+        }
+        chprintf((BaseSequentialStream *)&RTT_S0, "=====================================\n\n");
+    }
+}
+
+/* ============================================================================
  * THREAD FUNCTIONS
  * ============================================================================ */
 
@@ -452,11 +616,16 @@ static THD_WORKING_AREA(waThread1, 128);
 static THD_FUNCTION(Thread1, arg) {
   (void)arg;
   chRegSetThreadName("blinker");
+  
   while (true) {
+    update_thread_loop_start("blinker");
+    
     palClearLine(LINE_LED_RED_E12);
     chThdSleepMilliseconds(1000);
     palSetLine(LINE_LED_RED_E12);
     chThdSleepMilliseconds(1000);
+    
+    update_thread_loop_end("blinker");
   }
 }
 
@@ -487,24 +656,28 @@ static const ShellConfig shell_cfg1 = {
 #include "usbh/dev/hid.h"
 
 
-static THD_WORKING_AREA(waUsbHost, 256);
+static THD_WORKING_AREA(waUsbHost, 1024);
 
 static USBH_DEFINE_BUFFER(uint8_t report[HAL_USBHHID_MAX_INSTANCES][64]);
 static USBHHIDConfig hidcfg[HAL_USBHHID_MAX_INSTANCES];
 
+//! 媽的，原來呢個係ISR callback function嚟，記得用ISR class call 同 lock section 保護
+// https://github.com/Ryochan7/DS4Windows/issues/1608 the ps5 callback frequency should be around 250 hz
 static void _hid_report_callback(USBHHIDDriver *hidp, uint16_t len) {
+    chSysLockFromISR();
     uint8_t *report = (uint8_t *)hidp->config->report_buffer;
-
+    
     /* Try DualSense direct decode → publish latest-only */
     uint8_t next = ds5PublishedIndex ^ 1;            /* back buffer */
     if (ds5_from_hid_report(report, len, &ds5Buf[next])) {
         ds5PublishedIndex = next;                    /* publish */
         ds5Generation++;
-        chEvtBroadcast(&esDS5Ready);                 /* notify all consumers */
+        chEvtBroadcastI(&esDS5Ready);                 /* notify all consumers */
     }
+    chSysUnlockFromISR();
 }
 
-static THD_WORKING_AREA(waTestHID, 256);
+static THD_WORKING_AREA(waTestHID, 1024);
 static void ThreadTestHID(void *p) {
   (void)p;
   uint8_t i;
@@ -522,6 +695,8 @@ static void ThreadTestHID(void *p) {
   chprintf((BaseSequentialStream *)&RTT_S0, "HID Thread started\n");  // Add this
 
   for (;;) {
+      update_thread_loop_start("HID");
+      
       for (i = 0; i < HAL_USBHHID_MAX_INSTANCES; i++) {
           USBHHIDDriver *const hidp = &USBHHIDD[i];
           usbhhid_state_t state = usbhhidGetState(hidp);
@@ -540,6 +715,8 @@ static void ThreadTestHID(void *p) {
           }
       }
       chThdSleepMilliseconds(500);
+      
+      update_thread_loop_end("HID");
   }
 }
 
@@ -553,13 +730,17 @@ static THD_FUNCTION(UsbHostThread, arg) {
   chprintf((BaseSequentialStream *)&RTT_S0, "USB Host Thread started\n");
   
   while (true) {
+    update_thread_loop_start("usb_host");
+    
     #if STM32_USBH_USE_OTG2
       usbhMainLoop(&USBHD2);
     #endif
     #if STM32_USBH_USE_OTG1
       usbhMainLoop(&USBHD1);
     #endif
-    chThdSleepMilliseconds(10);  // 10ms polling for USB events
+    chThdSleepMilliseconds(100);  // 10ms polling for USB events
+    
+    update_thread_loop_end("usb_host");
   }
 }
 #endif
@@ -621,6 +802,8 @@ static THD_FUNCTION(UdpServerThread, arg) {
   chprintf((BaseSequentialStream *)&RTT_S0, "UDP Server started on port %d\n", UDP_SERVER_PORT);
   
   while (true) {
+    update_thread_loop_start("udp_server");
+    
     /* Wait for new DS5 data when idle; busy processing will naturally coalesce */
     chEvtWaitOne(EVT_DS5_READY);
     uint32_t g = ds5Generation;
@@ -632,6 +815,8 @@ static THD_FUNCTION(UdpServerThread, arg) {
 
     // Send raw PS5Data byte array
     sendto(sock, (const void*)&snap, sizeof(PS5Data), 0, (struct sockaddr*)&bcast_addr, sizeof(bcast_addr));
+    
+    update_thread_loop_end("udp_server");
   }
 }
 
@@ -640,7 +825,7 @@ static THD_FUNCTION(UdpServerThread, arg) {
  * ============================================================================ */
 
 /* nRF24 TX Broadcaster Thread - Sends latest DS5 snapshot over nRF24 in 32-byte chunks */
-static THD_WORKING_AREA(waNRF24Tx, 128);
+static THD_WORKING_AREA(waNRF24Tx, 2048);
 static THD_FUNCTION(NRF24TxThread, arg) {
   (void)arg;
   chRegSetThreadName("nrf24_tx");
@@ -652,16 +837,20 @@ static THD_FUNCTION(NRF24TxThread, arg) {
   uint8_t nrf_tx_addr[5] = {0x65, 0x64, 0x6F, 0x4E, 0x32}; // 0x32 0x4E 0x6F 0x64 0x65 = "2Node" !check endianness
 
   while (true) {
+    update_thread_loop_start("nrf24_tx");
+    
     chEvtWaitOne(EVT_DS5_READY);
 
     uint8_t idx = ds5PublishedIndex;
-    PS5Data snap;
-    convert_to_trimmed(&ds5Buf[idx], &snap);
+
+    // print_ps5data_hex(&ds5Buf[idx], "PS5Data Structure");
 
     //! blocking call if set the use_ack to TRUE it will wait for the ack from the receiver
-    if (nrf24l01_basic_send(nrf_tx_addr, (uint8_t *)&snap, sizeof(PS5Data), NRF24L01_BOOL_TRUE) != 0) {
-      // Handle transmission error if needed
+    if (nrf24l01_basic_send(nrf_tx_addr, (uint8_t *)&ds5Buf[idx], sizeof(PS5Data), NRF24L01_BOOL_FALSE) != 0) {
+    //   // Handle transmission error if needed
     }
+    
+    update_thread_loop_end("nrf24_tx");
   }
 }
 
@@ -682,6 +871,8 @@ void myLinkDownCallback(void *p) {
   chprintf((BaseSequentialStream *)&RTT_S0, "Ethernet disconnected!\n");
 }
 
+//! there are random usb fs timeout problems for line 1464 in hal_usbh_lld.c for -Os build
+// https://community.st.com/t5/stm32-mcus/faq-troubleshooting-a-usb-core-soft-reset-stuck-on-an-stm32/ta-p/803224
 
 /*
  * Application entry point.
@@ -730,7 +921,6 @@ int main(void) {
 
   lwipInit(&lwipthread_opts);
 
-
   nrf24l01_basic_init(NRF24L01_TYPE_TX, interrupt_callback);
   palEnableLineEvent(LINE_SPI2_NRF24_IRQ, PAL_EVENT_MODE_FALLING_EDGE);
   palSetLineCallback(LINE_SPI2_NRF24_IRQ, nrf24l01_interface_gpio_interrupt_callback, NULL);
@@ -738,54 +928,33 @@ int main(void) {
   
   
 
-  uint8_t res = flashdb_init();
-  chprintf((BaseSequentialStream *)&RTT_S0, "flashdb_init result: %d\n", res);
-  char boot_count = 0;
-  flashdb_get_kv_value("boot_count", &boot_count, sizeof(boot_count));
-  boot_count++;
-  flashdb_set_kv_value("boot_count", &boot_count, sizeof(boot_count));
-  chprintf((BaseSequentialStream *)&RTT_S0, "Boot count: %d\n", boot_count);
+  // uint8_t res = flashdb_init();
+  // chprintf((BaseSequentialStream *)&RTT_S0, "flashdb_init result: %d\n", res);
+  // char boot_count = 0;
+  // flashdb_get_kv_value("boot_count", &boot_count, sizeof(boot_count));
+  // boot_count++;
+  // flashdb_set_kv_value("boot_count", &boot_count, sizeof(boot_count));
+  // chprintf((BaseSequentialStream *)&RTT_S0, "Boot count: %d\n", boot_count);
   
 
-  chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO+1, Thread1, NULL);
-  chThdCreateStatic(waUdpServer, sizeof(waUdpServer), NORMALPRIO, UdpServerThread, NULL);
-  chThdCreateStatic(waNRF24Tx, sizeof(waNRF24Tx), NORMALPRIO, NRF24TxThread, NULL);
-  chThdCreateStatic(waNRF24Interrupt, sizeof(waNRF24Interrupt), NORMALPRIO+3, NRF24InterruptThread, NULL);
-  chThdCreateStatic(waTestHID, sizeof(waTestHID), NORMALPRIO, ThreadTestHID, NULL);
-  chThdCreateStatic(waUsbHost, sizeof(waUsbHost), NORMALPRIO+2, UsbHostThread, NULL);
+  // Create threads and register them for monitoring
+  thread_t* blinker_tp = chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO+1, Thread1, NULL);
+  thread_t* udp_server_tp = chThdCreateStatic(waUdpServer, sizeof(waUdpServer), NORMALPRIO, UdpServerThread, NULL);
+  thread_t* nrf24_tx_tp = chThdCreateStatic(waNRF24Tx, sizeof(waNRF24Tx), NORMALPRIO, NRF24TxThread, NULL);
+  thread_t* nrf24_irq_tp = chThdCreateStatic(waNRF24Interrupt, sizeof(waNRF24Interrupt), NORMALPRIO+3, NRF24InterruptThread, NULL);
+  thread_t* hid_tp = chThdCreateStatic(waTestHID, sizeof(waTestHID), NORMALPRIO, ThreadTestHID, NULL);
+  thread_t* usb_host_tp = chThdCreateStatic(waUsbHost, sizeof(waUsbHost), NORMALPRIO+2, UsbHostThread, NULL);
   
-
-  uint8_t nrf_tx_addr[5] = {0x65, 0x64, 0x6F, 0x4E, 0x32}; // 0x32 0x4E 0x6F 0x64 0x65 = "2Node" !check endianness
-   PS5Data snap;
-   // Initialize all fields for testing
-   snap.hatValue[0] = 0x01;  // LX
-   snap.hatValue[1] = 0x02;  // LY
-   snap.hatValue[2] = 0x03;  // RX
-   snap.hatValue[3] = 0x04;  // RY
-   snap.trigger[0] = 0x00;   // L2
-   snap.trigger[1] = 0x00;   // R2
-   snap.sequence_number = 0x01;
-   snap.btn.val = 0x000001;  // Set some button bits
-   snap.reserved[0] = 0x00;
-   snap.reserved[1] = 0x00;
-   snap.reserved[2] = 0x00;
-   snap.reserved[3] = 0x00;
-   snap.reserved[4] = 0x00;
-   snap.gyroX = 0x1234;
-   snap.gyroZ = 0x5678;
-   snap.gyroY = 0x9ABC;
-   snap.accX = 0xDEF0;
-   snap.accZ = 0x1111;
-   snap.accY = 0x2222;
-   snap.sensor_timestamp = 0x12345678;
+  // Register threads for monitoring
+  register_thread_monitor("blinker", blinker_tp);
+  register_thread_monitor("udp_server", udp_server_tp);
+  register_thread_monitor("nrf24_tx", nrf24_tx_tp);
+  register_thread_monitor("nrf24_irq", nrf24_irq_tp);
+  register_thread_monitor("HID", hid_tp);
+  register_thread_monitor("usb_host", usb_host_tp);
   
-   // Print hex dump of the snap structure
-   print_ps5data_hex(&snap, "PS5Data Structure");
-   
-   res = nrf24l01_basic_send(nrf_tx_addr, (uint8_t *)&snap, sizeof(PS5Data), NRF24L01_BOOL_TRUE);
-   chprintf((BaseSequentialStream *)&RTT_S0, "nrf24l01_basic_send result: %d\n", res);
-
-  
+  // Create and start the thread monitor
+  chThdCreateStatic(waThreadMonitor, sizeof(waThreadMonitor), NORMALPRIO-1, ThreadMonitor, NULL);
   
   while (1) {
       thread_t *shelltp = chThdCreateFromHeap(NULL, SHELL_WA_SIZE,

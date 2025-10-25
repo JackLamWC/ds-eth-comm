@@ -1590,7 +1590,7 @@ void usbh_lld_start(USBHDriver *host) {
 #endif
 
 		/* OTG HS clock enable and reset.*/
-		rccEnableOTG2(FALSE); // Disable HS clock when cpu is in sleep mode
+		rccEnableOTG2(TRUE); // Disable HS clock when cpu is in sleep mode
 		rccResetOTG2();
 
 #if STM32_OTG2_USE_HS

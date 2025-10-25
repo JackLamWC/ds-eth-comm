@@ -5,7 +5,7 @@
 
 # Compiler options here.
 ifeq ($(USE_OPT),)
-  USE_OPT = -Os -ggdb -fomit-frame-pointer -falign-functions=16
+  USE_OPT = -O2 -ggdb -fomit-frame-pointer -falign-functions=16
 endif
 
 # C specific options here (added to USE_OPT).
@@ -30,7 +30,7 @@ endif
 
 # Enable this if you want link time optimizations (LTO).
 ifeq ($(USE_LTO),)
-  USE_LTO = yes
+  USE_LTO = no
 endif
 
 # Enable this if you want to see the full log while compiling.
@@ -55,7 +55,7 @@ endif
 # Stack size to be allocated to the Cortex-M process stack. This stack is
 # the stack used by the main() thread.
 ifeq ($(USE_PROCESS_STACKSIZE),)
-  USE_PROCESS_STACKSIZE = 0x500
+  USE_PROCESS_STACKSIZE = 0x400
 endif
 
 # Stack size to the allocated to the Cortex-M main/exceptions stack. This
@@ -115,7 +115,7 @@ include $(CHIBIOS)/tools/mk/autobuild.mk
 
 include $(CHIBIOS)/os/various/lwip_bindings/lwip.mk
 
-include $(FLASHDBDIR)/flashdb.mk
+# include $(FLASHDBDIR)/flashdb.mk
 # Define linker script file here
 LDSCRIPT= $(STARTUPLD)/STM32H750xB.ld
 
@@ -125,8 +125,6 @@ CSRC = $(ALLCSRC) \
        ./src/RTT/SEGGER_RTT.c \
        ./src/RTT/SEGGER_RTT_printf.c \
        ./src/RTT/SEGGER_RTT_Channel.c \
-       ./src/w25qxx/w25qxx.c \
-       ./src/w25qxx/w25qxx_interface.c \
        ./src/nrf24l01/nrf24l01.c \
        ./src/nrf24l01/nrf24l01_interface.c \
        ./src/nrf24l01/nrf24l01_basic.c \
@@ -144,7 +142,7 @@ ASMSRC = $(ALLASMSRC)
 ASMXSRC = $(ALLXASMSRC)
 
 # Inclusion directories.
-INCDIR = $(CONFDIR) $(BOARDDIR) $(ALLINC) ./src/RTT ./src/w25qxx ./src/nrf24l01
+INCDIR = $(CONFDIR) $(BOARDDIR) $(ALLINC) ./src/RTT ./src/nrf24l01
 
 # Define C warning options here.
 CWARN = -Wall -Wextra -Wundef -Wstrict-prototypes

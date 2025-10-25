@@ -103,6 +103,10 @@
 #define GPIOB_PIN15                 15U
 #define GPIOB_SPI2_NRF24_MOSI       15U
 
+/* QSPI remap to match schematic */
+#define GPIOB_QSPI_CLK              2U   /* PB2 AF9 */
+#define GPIOB_QSPI_BK1_NCS          6U   /* PB6 AF10 */
+
 #define GPIOC_PIN0                  0U
 #define GPIOC_RMII_MDC              1U
 #define GPIOC_PIN2                  2U
@@ -133,14 +137,14 @@
 #define GPIOD_SDRAM_D14             9U
 #define GPIOD_SDRAM_D15             10U
 #define GPIOD_QSPI_BK1_IO0          11U
-#define GPIOD_I2C4_SCL              12U
-#define GPIOD_I2C4_SDA              13U
+#define GPIOD_QSPI_BK1_IO1          12U  /* PD12 AF9 */
+#define GPIOD_QSPI_BK1_IO3          13U  /* PD13 AF9 */
 #define GPIOD_SDRAM_D0              14U
 #define GPIOD_SDRAM_D1              15U
 
 #define GPIOE_SDRAM_NBL0            0U
 #define GPIOE_SDRAM_NBL1            1U
-#define GPIOE_PIN2                  2U
+#define GPIOE_QSPI_BK1_IO2          2U   /* PE2 AF9 */
 #define GPIOE_PIN3                  3U
 #define GPIOE_SAI4_D2               4U
 #define GPIOE_SAI4_CK2              5U
@@ -307,8 +311,8 @@
 #define LINE_SDRAM_D14              PAL_LINE(GPIOD, 9U)
 #define LINE_SDRAM_D15              PAL_LINE(GPIOD, 10U)
 #define LINE_QSPI_BK1_IO0           PAL_LINE(GPIOD, 11U)
-#define LINE_I2C4_SCL               PAL_LINE(GPIOD, 12U)
-#define LINE_I2C4_SDA               PAL_LINE(GPIOD, 13U)
+#define LINE_QSPI_BK1_IO1           PAL_LINE(GPIOD, 12U)
+#define LINE_QSPI_BK1_IO3           PAL_LINE(GPIOD, 13U)
 #define LINE_SDRAM_D0               PAL_LINE(GPIOD, 14U)
 #define LINE_SDRAM_D1               PAL_LINE(GPIOD, 15U)
 #define LINE_SDRAM_NBL0             PAL_LINE(GPIOE, 0U)
@@ -329,10 +333,10 @@
 #define LINE_SDRAM_A3               PAL_LINE(GPIOF, 3U)
 #define LINE_SDRAM_A4               PAL_LINE(GPIOF, 4U)
 #define LINE_SDRAM_A5               PAL_LINE(GPIOF, 5U)
-#define LINE_QSPI_BK1_IO3           PAL_LINE(GPIOF, 6U)
-#define LINE_QSPI_BK1_IO2           PAL_LINE(GPIOF, 7U)
-#define LINE_QSPI_BK1_IO1           PAL_LINE(GPIOF, 9U)
-#define LINE_QSPI_CLK               PAL_LINE(GPIOF, 10U)
+#define LINE_QSPI_BK1_IO3           PAL_LINE(GPIOD, 13U) /* moved */
+#define LINE_QSPI_BK1_IO2           PAL_LINE(GPIOE, 2U)  /* moved */
+#define LINE_QSPI_BK1_IO1           PAL_LINE(GPIOD, 12U) /* moved */
+#define LINE_QSPI_CLK               PAL_LINE(GPIOB, 2U)  /* moved */
 #define LINE_SDRAM_SDNRAS           PAL_LINE(GPIOF, 11U)
 #define LINE_SDRAM_A6               PAL_LINE(GPIOF, 12U)
 #define LINE_SDRAM_A7               PAL_LINE(GPIOF, 13U)
@@ -343,7 +347,7 @@
 #define LINE_LCD_INT                PAL_LINE(GPIOG, 2U)
 #define LINE_SDRAM_BA0              PAL_LINE(GPIOG, 4U)
 #define LINE_SDRAM_BA1              PAL_LINE(GPIOG, 5U)
-#define LINE_QSPI_BK1_NCS           PAL_LINE(GPIOG, 6U)
+#define LINE_QSPI_BK1_NCS           PAL_LINE(GPIOB, 6U)  /* moved */
 #define LINE_SDRAM_SDCLK            PAL_LINE(GPIOG, 8U)
 #define LINE_QSPI_BK2_IO2           PAL_LINE(GPIOG, 9U)
 #define LINE_SAI2_SDB               PAL_LINE(GPIOG, 10U)
@@ -573,11 +577,11 @@
  */
 #define VAL_GPIOB_MODER             (PIN_MODE_INPUT(GPIOB_PIN0) |   \
                                      PIN_MODE_INPUT(GPIOB_PIN1) |   \
-                                     PIN_MODE_INPUT(GPIOB_PIN2) |\
+                                     PIN_MODE_ALTERNATE(GPIOB_QSPI_CLK) |\
                                      PIN_MODE_ALTERNATE(GPIOB_SPI_FLASH_CLK) |        \
                                      PIN_MODE_ALTERNATE(GPIOB_SPI_FLASH_SO) |           \
                                      PIN_MODE_ALTERNATE(GPIOB_SPI_FLASH_SI) |  \
-                                     PIN_MODE_INPUT(GPIOB_PIN6) |           \
+                                     PIN_MODE_ALTERNATE(GPIOB_QSPI_BK1_NCS) |           \
                                      PIN_MODE_INPUT(GPIOB_PIN7) |           \
                                      PIN_MODE_OUTPUT(GPIOB_SPI2_NRF24_CS) |  \
                                      PIN_MODE_ALTERNATE(GPIOB_SDIO1_D5) |   \
@@ -589,11 +593,11 @@
                                      PIN_MODE_ALTERNATE(GPIOB_SPI2_NRF24_MOSI))
 #define VAL_GPIOB_OTYPER            (PIN_OTYPE_PUSHPULL(GPIOB_PIN0) |   \
                                      PIN_OTYPE_PUSHPULL(GPIOB_PIN1) |   \
-                                     PIN_OTYPE_PUSHPULL(GPIOB_PIN2) |\
+                                     PIN_OTYPE_PUSHPULL(GPIOB_QSPI_CLK) |\
                                      PIN_OTYPE_PUSHPULL(GPIOB_SPI_FLASH_CLK) |        \
                                      PIN_OTYPE_PUSHPULL(GPIOB_SPI_FLASH_SO) |       \
                                      PIN_OTYPE_PUSHPULL(GPIOB_SPI_FLASH_SI) |  \
-                                     PIN_OTYPE_PUSHPULL(GPIOB_PIN6) |       \
+                                     PIN_OTYPE_PUSHPULL(GPIOB_QSPI_BK1_NCS) |       \
                                      PIN_OTYPE_PUSHPULL(GPIOB_PIN7) |       \
                                      PIN_OTYPE_PUSHPULL(GPIOB_SPI2_NRF24_CS) |  \
                                      PIN_OTYPE_PUSHPULL(GPIOB_SDIO1_D5) |   \
@@ -605,11 +609,11 @@
                                      PIN_OTYPE_PUSHPULL(GPIOB_SPI2_NRF24_MOSI))
 #define VAL_GPIOB_OSPEEDR           (PIN_OSPEED_VERYLOW(GPIOB_PIN0) |      \
                                      PIN_OSPEED_VERYLOW(GPIOB_PIN1) |      \
-                                     PIN_OSPEED_VERYLOW(GPIOB_PIN2) |\
+                                     PIN_OSPEED_HIGH(GPIOB_QSPI_CLK) |\
                                      PIN_OSPEED_HIGH(GPIOB_SPI_FLASH_CLK) |           \
                                      PIN_OSPEED_HIGH(GPIOB_SPI_FLASH_SO) |       \
                                      PIN_OSPEED_HIGH(GPIOB_SPI_FLASH_SI) |     \
-                                     PIN_OSPEED_VERYLOW(GPIOB_PIN6) |       \
+                                     PIN_OSPEED_HIGH(GPIOB_QSPI_BK1_NCS) |       \
                                      PIN_OSPEED_HIGH(GPIOB_PIN7) |          \
                                      PIN_OSPEED_HIGH(GPIOB_SPI2_NRF24_CS) |  \
                                      PIN_OSPEED_VERYLOW(GPIOB_SDIO1_D5) |   \
@@ -621,11 +625,11 @@
                                      PIN_OSPEED_HIGH(GPIOB_SPI2_NRF24_MOSI))
 #define VAL_GPIOB_PUPDR             (PIN_PUPDR_FLOATING(GPIOB_PIN0) |   \
                                      PIN_PUPDR_FLOATING(GPIOB_PIN1) |   \
-                                     PIN_PUPDR_FLOATING(GPIOB_PIN2) |\
+                                     PIN_PUPDR_FLOATING(GPIOB_QSPI_CLK) |\
                                      PIN_PUPDR_FLOATING(GPIOB_SPI_FLASH_CLK) |          \
                                      PIN_PUPDR_FLOATING(GPIOB_SPI_FLASH_SO) |       \
                                      PIN_PUPDR_FLOATING(GPIOB_SPI_FLASH_SI) |  \
-                                     PIN_PUPDR_FLOATING(GPIOB_PIN6) |       \
+                                     PIN_PUPDR_PULLUP(GPIOB_QSPI_BK1_NCS) |       \
                                      PIN_PUPDR_FLOATING(GPIOB_PIN7) |       \
                                      PIN_PUPDR_PULLUP(GPIOB_SPI2_NRF24_CS) |  \
                                      PIN_PUPDR_FLOATING(GPIOB_SDIO1_D5) |   \
@@ -637,11 +641,11 @@
                                      PIN_PUPDR_FLOATING(GPIOB_SPI2_NRF24_MOSI))
 #define VAL_GPIOB_ODR               (PIN_ODR_HIGH(GPIOB_PIN0) |         \
                                      PIN_ODR_HIGH(GPIOB_PIN1) |         \
-                                     PIN_ODR_HIGH(GPIOB_PIN2) |   \
+                                     PIN_ODR_HIGH(GPIOB_QSPI_CLK) |   \
                                      PIN_ODR_HIGH(GPIOB_SPI_FLASH_CLK) |              \
                                      PIN_ODR_HIGH(GPIOB_SPI_FLASH_SO) |             \
                                      PIN_ODR_HIGH(GPIOB_SPI_FLASH_SI) |        \
-                                     PIN_ODR_HIGH(GPIOB_PIN6) |             \
+                                     PIN_ODR_HIGH(GPIOB_QSPI_BK1_NCS) |             \
                                      PIN_ODR_LOW(GPIOB_PIN7) |              \
                                      PIN_ODR_HIGH(GPIOB_SPI2_NRF24_CS) |    \
                                      PIN_ODR_HIGH(GPIOB_SDIO1_D5) |         \
@@ -653,11 +657,11 @@
                                      PIN_ODR_HIGH(GPIOB_SPI2_NRF24_MOSI))
 #define VAL_GPIOB_AFRL              (PIN_AFIO_AF(GPIOB_PIN0, 0U) |     \
                                      PIN_AFIO_AF(GPIOB_PIN1, 0U) |     \
-                                     PIN_AFIO_AF(GPIOB_PIN2, 0U) |\
+                                     PIN_AFIO_AF(GPIOB_QSPI_CLK, 9U) |\
                                      PIN_AFIO_AF(GPIOB_SPI_FLASH_CLK, 5U) |           \
                                      PIN_AFIO_AF(GPIOB_SPI_FLASH_SO,  5U) |          \
                                      PIN_AFIO_AF(GPIOB_SPI_FLASH_SI,  5U) |     \
-                                     PIN_AFIO_AF(GPIOB_PIN6, 0U) |          \
+                                     PIN_AFIO_AF(GPIOB_QSPI_BK1_NCS, 10U) |          \
                                      PIN_AFIO_AF(GPIOB_PIN7, 0U))
 #define VAL_GPIOB_AFRH              (PIN_AFIO_AF(GPIOB_SPI2_NRF24_CS, 0U) |  \
                                      PIN_AFIO_AF(GPIOB_SDIO1_D5, 12U) |     \
@@ -806,7 +810,7 @@
  * PD15 - SDRAM_D1                  (alternate 12).
  */
 #define VAL_GPIOD_MODER             (PIN_MODE_OUTPUT(GPIOD_NRF24_CE) |      \
-                                    PIN_MODE_INPUT(GPIOD_SPI2_NRF24_IRQ) | \
+                                   PIN_MODE_INPUT(GPIOD_SPI2_NRF24_IRQ) | \
                                      PIN_MODE_ALTERNATE(GPIOD_SDIO1_CMD) |  \
                                      PIN_MODE_OUTPUT(GPIOD_SPI_FLASH_CS) |           \
                                      PIN_MODE_INPUT(GPIOD_PIN4) |           \
@@ -817,8 +821,8 @@
                                      PIN_MODE_ALTERNATE(GPIOD_SDRAM_D14) |  \
                                      PIN_MODE_ALTERNATE(GPIOD_SDRAM_D15) |  \
                                      PIN_MODE_ALTERNATE(GPIOD_QSPI_BK1_IO0) |\
-                                     PIN_MODE_ALTERNATE(GPIOD_I2C4_SCL) |   \
-                                     PIN_MODE_ALTERNATE(GPIOD_I2C4_SDA) |   \
+                                     PIN_MODE_ALTERNATE(GPIOD_QSPI_BK1_IO1) |   \
+                                     PIN_MODE_ALTERNATE(GPIOD_QSPI_BK1_IO3) |   \
                                      PIN_MODE_ALTERNATE(GPIOD_SDRAM_D0) |   \
                                      PIN_MODE_ALTERNATE(GPIOD_SDRAM_D1))
 #define VAL_GPIOD_OTYPER            (PIN_OTYPE_PUSHPULL(GPIOD_NRF24_CE) |   \
@@ -833,8 +837,8 @@
                                      PIN_OTYPE_PUSHPULL(GPIOD_SDRAM_D14) |  \
                                      PIN_OTYPE_PUSHPULL(GPIOD_SDRAM_D15) |  \
                                      PIN_OTYPE_PUSHPULL(GPIOD_QSPI_BK1_IO0) |\
-                                     PIN_OTYPE_PUSHPULL(GPIOD_I2C4_SCL) |   \
-                                     PIN_OTYPE_PUSHPULL(GPIOD_I2C4_SDA) |   \
+                                     PIN_OTYPE_PUSHPULL(GPIOD_QSPI_BK1_IO1) |   \
+                                     PIN_OTYPE_PUSHPULL(GPIOD_QSPI_BK1_IO3) |   \
                                      PIN_OTYPE_PUSHPULL(GPIOD_SDRAM_D0) |   \
                                      PIN_OTYPE_PUSHPULL(GPIOD_SDRAM_D1))
 #define VAL_GPIOD_OSPEEDR           (PIN_OSPEED_HIGH(GPIOD_NRF24_CE) |      \
@@ -849,8 +853,8 @@
                                      PIN_OSPEED_HIGH(GPIOD_SDRAM_D14) |     \
                                      PIN_OSPEED_HIGH(GPIOD_SDRAM_D15) |     \
                                      PIN_OSPEED_HIGH(GPIOD_QSPI_BK1_IO0) |  \
-                                     PIN_OSPEED_HIGH(GPIOD_I2C4_SCL) |      \
-                                     PIN_OSPEED_HIGH(GPIOD_I2C4_SDA) |      \
+                                     PIN_OSPEED_HIGH(GPIOD_QSPI_BK1_IO1) |      \
+                                     PIN_OSPEED_HIGH(GPIOD_QSPI_BK1_IO3) |      \
                                      PIN_OSPEED_HIGH(GPIOD_SDRAM_D0) |      \
                                      PIN_OSPEED_HIGH(GPIOD_SDRAM_D1))
 #define VAL_GPIOD_PUPDR             (PIN_PUPDR_PULLDOWN(GPIOD_NRF24_CE) |     \
@@ -865,8 +869,8 @@
                                      PIN_PUPDR_FLOATING(GPIOD_SDRAM_D14) |  \
                                      PIN_PUPDR_FLOATING(GPIOD_SDRAM_D15) |  \
                                      PIN_PUPDR_FLOATING(GPIOD_QSPI_BK1_IO0) |\
-                                     PIN_PUPDR_FLOATING(GPIOD_I2C4_SCL) |   \
-                                     PIN_PUPDR_FLOATING(GPIOD_I2C4_SDA) |   \
+                                     PIN_PUPDR_FLOATING(GPIOD_QSPI_BK1_IO1) |   \
+                                     PIN_PUPDR_FLOATING(GPIOD_QSPI_BK1_IO3) |   \
                                      PIN_PUPDR_FLOATING(GPIOD_SDRAM_D0) |   \
                                      PIN_PUPDR_FLOATING(GPIOD_SDRAM_D1))
 #define VAL_GPIOD_ODR               (PIN_ODR_HIGH(GPIOD_NRF24_CE) |         \
@@ -881,8 +885,8 @@
                                      PIN_ODR_HIGH(GPIOD_SDRAM_D14) |        \
                                      PIN_ODR_HIGH(GPIOD_SDRAM_D15) |        \
                                      PIN_ODR_HIGH(GPIOD_QSPI_BK1_IO0) |     \
-                                     PIN_ODR_HIGH(GPIOD_I2C4_SCL) |         \
-                                     PIN_ODR_HIGH(GPIOD_I2C4_SDA) |         \
+                                     PIN_ODR_HIGH(GPIOD_QSPI_BK1_IO1) |         \
+                                     PIN_ODR_HIGH(GPIOD_QSPI_BK1_IO3) |         \
                                      PIN_ODR_HIGH(GPIOD_SDRAM_D0) |         \
                                      PIN_ODR_HIGH(GPIOD_SDRAM_D1))
 #define VAL_GPIOD_AFRL              (PIN_AFIO_AF(GPIOD_NRF24_CE, 0U) |      \
@@ -897,8 +901,8 @@
                                      PIN_AFIO_AF(GPIOD_SDRAM_D14, 12U) |    \
                                      PIN_AFIO_AF(GPIOD_SDRAM_D15, 12U) |    \
                                      PIN_AFIO_AF(GPIOD_QSPI_BK1_IO0, 9U) |  \
-                                     PIN_AFIO_AF(GPIOD_I2C4_SCL, 4U) |      \
-                                     PIN_AFIO_AF(GPIOD_I2C4_SDA, 4U) |      \
+                                     PIN_AFIO_AF(GPIOD_QSPI_BK1_IO1, 9U) |      \
+                                     PIN_AFIO_AF(GPIOD_QSPI_BK1_IO3, 9U) |      \
                                      PIN_AFIO_AF(GPIOD_SDRAM_D0, 12U) |     \
                                      PIN_AFIO_AF(GPIOD_SDRAM_D1, 12U))
 
@@ -924,7 +928,7 @@
  */
 #define VAL_GPIOE_MODER             (PIN_MODE_ALTERNATE(GPIOE_SDRAM_NBL0) | \
                                      PIN_MODE_ALTERNATE(GPIOE_SDRAM_NBL1) | \
-                                     PIN_MODE_INPUT(GPIOE_PIN2) |   \
+                                     PIN_MODE_ALTERNATE(GPIOE_QSPI_BK1_IO2) |   \
                                      PIN_MODE_INPUT(GPIOE_PIN3) |           \
                                      PIN_MODE_ALTERNATE(GPIOE_SAI4_D2) |    \
                                      PIN_MODE_ALTERNATE(GPIOE_SAI4_CK2) |   \
@@ -940,7 +944,7 @@
                                      PIN_MODE_ALTERNATE(GPIOE_SDRAM_D12))
 #define VAL_GPIOE_OTYPER            (PIN_OTYPE_PUSHPULL(GPIOE_SDRAM_NBL0) | \
                                      PIN_OTYPE_PUSHPULL(GPIOE_SDRAM_NBL1) | \
-                                     PIN_OTYPE_PUSHPULL(GPIOE_PIN2) |   \
+                                     PIN_OTYPE_PUSHPULL(GPIOE_QSPI_BK1_IO2) |   \
                                      PIN_OTYPE_PUSHPULL(GPIOE_PIN3) |       \
                                      PIN_OTYPE_PUSHPULL(GPIOE_SAI4_D2) |    \
                                      PIN_OTYPE_PUSHPULL(GPIOE_SAI4_CK2) |   \
@@ -956,7 +960,7 @@
                                      PIN_OTYPE_PUSHPULL(GPIOE_SDRAM_D12))
 #define VAL_GPIOE_OSPEEDR           (PIN_OSPEED_HIGH(GPIOE_SDRAM_NBL0) |    \
                                      PIN_OSPEED_HIGH(GPIOE_SDRAM_NBL1) |    \
-                                     PIN_OSPEED_VERYLOW(GPIOE_PIN2) |      \
+                                     PIN_OSPEED_HIGH(GPIOE_QSPI_BK1_IO2) |      \
                                      PIN_OSPEED_VERYLOW(GPIOE_PIN3) |       \
                                      PIN_OSPEED_HIGH(GPIOE_SAI4_D2) |       \
                                      PIN_OSPEED_HIGH(GPIOE_SAI4_CK2) |      \
@@ -972,7 +976,7 @@
                                      PIN_OSPEED_HIGH(GPIOE_SDRAM_D12))
 #define VAL_GPIOE_PUPDR             (PIN_PUPDR_FLOATING(GPIOE_SDRAM_NBL0) | \
                                      PIN_PUPDR_FLOATING(GPIOE_SDRAM_NBL1) | \
-                                     PIN_PUPDR_FLOATING(GPIOE_PIN2) |   \
+                                     PIN_PUPDR_FLOATING(GPIOE_QSPI_BK1_IO2) |   \
                                      PIN_PUPDR_FLOATING(GPIOE_PIN3) |       \
                                      PIN_PUPDR_FLOATING(GPIOE_SAI4_D2) |    \
                                      PIN_PUPDR_FLOATING(GPIOE_SAI4_CK2) |   \
@@ -988,7 +992,7 @@
                                      PIN_PUPDR_FLOATING(GPIOE_SDRAM_D12))
 #define VAL_GPIOE_ODR               (PIN_ODR_HIGH(GPIOE_SDRAM_NBL0) |       \
                                      PIN_ODR_HIGH(GPIOE_SDRAM_NBL1) |       \
-                                     PIN_ODR_HIGH(GPIOE_PIN2) |         \
+                                     PIN_ODR_HIGH(GPIOE_QSPI_BK1_IO2) |         \
                                      PIN_ODR_HIGH(GPIOE_PIN3) |             \
                                      PIN_ODR_HIGH(GPIOE_SAI4_D2) |          \
                                      PIN_ODR_HIGH(GPIOE_SAI4_CK2) |         \
@@ -1004,7 +1008,7 @@
                                      PIN_ODR_HIGH(GPIOE_SDRAM_D12))
 #define VAL_GPIOE_AFRL              (PIN_AFIO_AF(GPIOE_SDRAM_NBL0, 12U) |   \
                                      PIN_AFIO_AF(GPIOE_SDRAM_NBL1, 12U) |   \
-                                     PIN_AFIO_AF(GPIOE_PIN2, 0U) |     \
+                                     PIN_AFIO_AF(GPIOE_QSPI_BK1_IO2, 9U) |     \
                                      PIN_AFIO_AF(GPIOE_PIN3, 0U) |          \
                                      PIN_AFIO_AF(GPIOE_SAI4_D2, 10U) |      \
                                      PIN_AFIO_AF(GPIOE_SAI4_CK2, 10U) |     \
@@ -1045,11 +1049,11 @@
                                      PIN_MODE_ALTERNATE(GPIOF_SDRAM_A3) |   \
                                      PIN_MODE_ALTERNATE(GPIOF_SDRAM_A4) |   \
                                      PIN_MODE_ALTERNATE(GPIOF_SDRAM_A5) |   \
-                                     PIN_MODE_ALTERNATE(GPIOF_QSPI_BK1_IO3) |\
-                                     PIN_MODE_ALTERNATE(GPIOF_QSPI_BK1_IO2) |\
+                                     PIN_MODE_INPUT(GPIOF_QSPI_BK1_IO3) |\
+                                     PIN_MODE_INPUT(GPIOF_QSPI_BK1_IO2) |\
                                      PIN_MODE_INPUT(GPIOF_PIN8) |           \
-                                     PIN_MODE_ALTERNATE(GPIOF_QSPI_BK1_IO1) |\
-                                     PIN_MODE_ALTERNATE(GPIOF_QSPI_CLK) |   \
+                                     PIN_MODE_INPUT(GPIOF_QSPI_BK1_IO1) |\
+                                     PIN_MODE_INPUT(GPIOF_QSPI_CLK) |   \
                                      PIN_MODE_ALTERNATE(GPIOF_SDRAM_SDNRAS) |\
                                      PIN_MODE_ALTERNATE(GPIOF_SDRAM_A6) |   \
                                      PIN_MODE_ALTERNATE(GPIOF_SDRAM_A7) |   \
@@ -1077,11 +1081,11 @@
                                      PIN_OSPEED_HIGH(GPIOF_SDRAM_A3) |      \
                                      PIN_OSPEED_HIGH(GPIOF_SDRAM_A4) |      \
                                      PIN_OSPEED_HIGH(GPIOF_SDRAM_A5) |      \
-                                     PIN_OSPEED_HIGH(GPIOF_QSPI_BK1_IO3) |  \
-                                     PIN_OSPEED_HIGH(GPIOF_QSPI_BK1_IO2) |  \
+                                     PIN_OSPEED_VERYLOW(GPIOF_QSPI_BK1_IO3) |  \
+                                     PIN_OSPEED_VERYLOW(GPIOF_QSPI_BK1_IO2) |  \
                                      PIN_OSPEED_VERYLOW(GPIOF_PIN8) |       \
-                                     PIN_OSPEED_HIGH(GPIOF_QSPI_BK1_IO1) |  \
-                                     PIN_OSPEED_HIGH(GPIOF_QSPI_CLK) |      \
+                                     PIN_OSPEED_VERYLOW(GPIOF_QSPI_BK1_IO1) |  \
+                                     PIN_OSPEED_VERYLOW(GPIOF_QSPI_CLK) |      \
                                      PIN_OSPEED_HIGH(GPIOF_SDRAM_SDNRAS) |  \
                                      PIN_OSPEED_HIGH(GPIOF_SDRAM_A6) |      \
                                      PIN_OSPEED_HIGH(GPIOF_SDRAM_A7) |      \
@@ -1125,11 +1129,11 @@
                                      PIN_AFIO_AF(GPIOF_SDRAM_A3, 12U) |     \
                                      PIN_AFIO_AF(GPIOF_SDRAM_A4, 12U) |     \
                                      PIN_AFIO_AF(GPIOF_SDRAM_A5, 12U) |     \
-                                     PIN_AFIO_AF(GPIOF_QSPI_BK1_IO3, 9U) |  \
-                                     PIN_AFIO_AF(GPIOF_QSPI_BK1_IO2, 9U))
+                                     PIN_AFIO_AF(GPIOF_QSPI_BK1_IO3, 0U) |  \
+                                     PIN_AFIO_AF(GPIOF_QSPI_BK1_IO2, 0U))
 #define VAL_GPIOF_AFRH              (PIN_AFIO_AF(GPIOF_PIN8, 0U) |          \
-                                     PIN_AFIO_AF(GPIOF_QSPI_BK1_IO1, 10U) | \
-                                     PIN_AFIO_AF(GPIOF_QSPI_CLK, 9U) |      \
+                                     PIN_AFIO_AF(GPIOF_QSPI_BK1_IO1, 0U) | \
+                                     PIN_AFIO_AF(GPIOF_QSPI_CLK, 0U) |      \
                                      PIN_AFIO_AF(GPIOF_SDRAM_SDNRAS, 12U) | \
                                      PIN_AFIO_AF(GPIOF_SDRAM_A6, 12U) |     \
                                      PIN_AFIO_AF(GPIOF_SDRAM_A7, 12U) |     \
@@ -1162,7 +1166,7 @@
                                      PIN_MODE_INPUT(GPIOG_PIN3) |           \
                                      PIN_MODE_ALTERNATE(GPIOG_SDRAM_BA0) |  \
                                      PIN_MODE_ALTERNATE(GPIOG_SDRAM_BA1) |  \
-                                     PIN_MODE_ALTERNATE(GPIOG_QSPI_BK1_NCS) |\
+                                     PIN_MODE_INPUT(GPIOG_QSPI_BK1_NCS) |\
                                      PIN_MODE_INPUT(GPIOG_PIN7) |           \
                                      PIN_MODE_ALTERNATE(GPIOG_SDRAM_SDCLK) |\
                                      PIN_MODE_ALTERNATE(GPIOG_QSPI_BK2_IO2) |\
@@ -1194,7 +1198,7 @@
                                      PIN_OSPEED_VERYLOW(GPIOG_PIN3) |       \
                                      PIN_OSPEED_HIGH(GPIOG_SDRAM_BA0) |     \
                                      PIN_OSPEED_HIGH(GPIOG_SDRAM_BA1) |     \
-                                     PIN_OSPEED_HIGH(GPIOG_QSPI_BK1_NCS) |  \
+                                     PIN_OSPEED_VERYLOW(GPIOG_QSPI_BK1_NCS) |  \
                                      PIN_OSPEED_VERYLOW(GPIOG_PIN7) |       \
                                      PIN_OSPEED_HIGH(GPIOG_SDRAM_SDCLK) |   \
                                      PIN_OSPEED_HIGH(GPIOG_QSPI_BK2_IO2) |  \
@@ -1242,7 +1246,7 @@
                                      PIN_AFIO_AF(GPIOG_PIN3, 0U) |          \
                                      PIN_AFIO_AF(GPIOG_SDRAM_BA0, 12U) |    \
                                      PIN_AFIO_AF(GPIOG_SDRAM_BA1, 12U) |    \
-                                     PIN_AFIO_AF(GPIOG_QSPI_BK1_NCS, 10U) | \
+                                     PIN_AFIO_AF(GPIOG_QSPI_BK1_NCS, 0U) | \
                                      PIN_AFIO_AF(GPIOG_PIN7, 0U))
 #define VAL_GPIOG_AFRH              (PIN_AFIO_AF(GPIOG_SDRAM_SDCLK, 12U) |  \
                                      PIN_AFIO_AF(GPIOG_QSPI_BK2_IO2, 9U) |  \

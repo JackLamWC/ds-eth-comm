@@ -414,8 +414,7 @@ uint8_t nrf24l01_send(nrf24l01_handle_t *handle, uint8_t *buf, uint8_t len, nrf2
     }
 
     uint8_t feature;
-    res = a_nrf24l01_spi_read(handle, NRF24L01_REG_FEATURE, (uint8_t *)&feature, 1);
-    handle->debug_print("nrf24l01: feature: %d\n", feature);    
+    res = a_nrf24l01_spi_read(handle, NRF24L01_REG_FEATURE, (uint8_t *)&feature, 1);  
     
     /* only wait for completion if using ACK */
     if (use_ack == NRF24L01_BOOL_TRUE)

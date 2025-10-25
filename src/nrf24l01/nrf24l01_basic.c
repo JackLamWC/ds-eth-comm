@@ -140,7 +140,7 @@
      }
      
      /* enable max rt */
-     res = nrf24l01_set_config(&gs_handle, NRF24L01_CONFIG_MASK_MAX_RT, NRF24L01_BOOL_FALSE);
+     res = nrf24l01_set_config(&gs_handle, NRF24L01_CONFIG_MASK_MAX_RT, NRF24L01_BOOL_TRUE);
      if (res != 0)
      {
          nrf24l01_interface_debug_print("nrf24l01: set config failed.\n");
@@ -150,7 +150,7 @@
      }
      
      /* enable tx ds */
-     res = nrf24l01_set_config(&gs_handle, NRF24L01_CONFIG_MASK_TX_DS, NRF24L01_BOOL_FALSE);
+     res = nrf24l01_set_config(&gs_handle, NRF24L01_CONFIG_MASK_TX_DS, NRF24L01_BOOL_TRUE);
      if (res != 0)
      {
          nrf24l01_interface_debug_print("nrf24l01: set config failed.\n");
@@ -160,7 +160,7 @@
      }
      
      /* enable rx dr */
-     res = nrf24l01_set_config(&gs_handle, NRF24L01_CONFIG_MASK_RX_DR, NRF24L01_BOOL_FALSE);
+     res = nrf24l01_set_config(&gs_handle, NRF24L01_CONFIG_MASK_RX_DR, NRF24L01_BOOL_TRUE);
      if (res != 0)
      {
          nrf24l01_interface_debug_print("nrf24l01: set config failed.\n");
