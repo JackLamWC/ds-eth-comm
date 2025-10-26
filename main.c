@@ -251,24 +251,19 @@ typedef struct {
  * GLOBAL VARIABLES
  * =========================================================================== */
 
-/* Thread Monitoring */
+/* ---------------------------------------------------------------------------
+ * Thread Monitor Variables
+ * Used by: ThreadMonitor
+ * --------------------------------------------------------------------------- */
 static thread_monitor_t thread_monitors[MAX_MONITORED_THREADS];
 static uint8_t monitor_count = 0;
 
-/* Shell Configuration */
-static char shell_history[SHELL_MAX_HIST_BUFF];
-static char *shell_completions[SHELL_MAX_COMPLETIONS];
-
-/* PS5 Controller Button Mapping Array */
-static const uint8_t PS5_BUTTONS[] = {
-    PS5_BTN_UP, PS5_BTN_RIGHT, PS5_BTN_DOWN, PS5_BTN_LEFT,
-    PS5_BTN_CREATE, PS5_BTN_OPTIONS, PS5_BTN_L3, PS5_BTN_R3,
-    PS5_BTN_L2, PS5_BTN_R2, PS5_BTN_L1, PS5_BTN_R1,
-    PS5_BTN_TRIANGLE, PS5_BTN_CIRCLE, PS5_BTN_CROSS, PS5_BTN_SQUARE,
-    PS5_BTN_PS, PS5_BTN_TOUCHPAD, PS5_BTN_MICROPHONE
-};
-
 #if HAL_USBH_USE_HID
+/* ---------------------------------------------------------------------------
+ * USB HID and PS5 Data Variables
+ * Used by: UsbHostThread, ThreadTestHID, and data consumers (UDP/nRF24)
+ * --------------------------------------------------------------------------- */
+
 /* PS5 Data Double Buffer - latest-only publication via event broadcast */
 static PS5DataFull ds5Buf[2];
 static volatile uint8_t ds5PublishedIndex = 0;
@@ -280,13 +275,26 @@ static USBH_DEFINE_BUFFER(uint8_t report[HAL_USBHHID_MAX_INSTANCES][64]);
 static USBHHIDConfig hidcfg[HAL_USBHHID_MAX_INSTANCES];
 #endif
 
-/* nRF24L01 Interrupt Event Source */
+/* ---------------------------------------------------------------------------
+ * nRF24L01 Variables
+ * Used by: NRF24InterruptThread, NRF24TxThread
+ * --------------------------------------------------------------------------- */
 static event_source_t esNRF24Interrupt;
 static event_listener_t nrf24_interrupt_listener;
 
-/* UDP Destination Configuration */
-static char udp_dest_ip[16] = "192.168.0.10";  /* Default destination IP */
-static mutex_t udp_dest_mutex;                   /* Mutex for thread-safe access */
+/* ---------------------------------------------------------------------------
+ * Network/UDP Variables
+ * Used by: UdpServerThread
+ * --------------------------------------------------------------------------- */
+static char udp_dest_ip[16] = "192.168.0.10";  /* Default UDP destination IP */
+static mutex_t udp_dest_mutex;                  /* Mutex for thread-safe UDP dest access */
+
+/* ---------------------------------------------------------------------------
+ * Shell Variables
+ * Used by: Shell thread
+ * --------------------------------------------------------------------------- */
+static char shell_history[SHELL_MAX_HIST_BUFF];
+static char *shell_completions[SHELL_MAX_COMPLETIONS];
 
 /* ===========================================================================
  * FORWARD DECLARATIONS
