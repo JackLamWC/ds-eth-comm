@@ -3,9 +3,9 @@ import struct
 
 # Create UDP socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.bind(('0.0.0.0', 12346))  # Listen on port 12345
+sock.bind(('0.0.0.0', 12346))  # Listen on port 12346
 
-print("Listening for UDP packets from MCU on port 12345...")
+print("Listening for UDP packets from MCU on port 12346...")
 print("Press Ctrl+C to stop")
 
 try:

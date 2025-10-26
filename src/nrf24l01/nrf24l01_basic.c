@@ -34,9 +34,11 @@
  * </table>
  */
 
- #include "nrf24l01_basic.h"
+#include "nrf24l01_basic.h"
 
- static nrf24l01_handle_t gs_handle;        /**< nrf24l01 handle */
+static nrf24l01_handle_t gs_handle;        /**< nrf24l01 handle */
+static uint8_t gs_tx_addr[5];              /**< tx address buffer */
+static uint8_t gs_tx_addr_set = 0;         /**< tx address set flag */
  
  /**
   * @brief  nrf24l01 irq
@@ -745,12 +747,155 @@ uint8_t nrf24l01_basic_send(uint8_t *addr, uint8_t *buf, uint8_t len, nrf24l01_b
          return 3;
      }
      
-    /* send data */
+   /* send data */
+   res = nrf24l01_send(&gs_handle, (uint8_t *)buf, len, use_ack);
+    if (res != 0)
+    {
+        return 1;
+    }
+    
+    return 0;
+}
+
+/**
+ * @brief     basic example set frequency
+ * @param[in] freq channel frequency (0-127)
+ * @return    status code
+ *            - 0 success
+ *            - 1 set frequency failed
+ * @note      actual frequency = 2400 MHz + freq MHz
+ *            freq must be <= 0x7F (127)
+ */
+uint8_t nrf24l01_basic_set_frequency(uint8_t freq)
+{
+    uint8_t res;
+    
+    /* set the channel frequency */
+    res = nrf24l01_set_channel_frequency(&gs_handle, freq);
+    if (res != 0)
+    {
+        nrf24l01_interface_debug_print("nrf24l01: set channel frequency failed.\n");
+        return 1;
+    }
+    
+    return 0;
+}
+
+/**
+ * @brief      basic example get frequency
+ * @param[out] *freq pointer to a channel frequency buffer
+ * @return     status code
+ *             - 0 success
+ *             - 1 get frequency failed
+ * @note       actual frequency = 2400 MHz + freq MHz
+ */
+uint8_t nrf24l01_basic_get_frequency(uint8_t *freq)
+{
+    uint8_t res;
+    
+    /* get the channel frequency */
+    res = nrf24l01_get_channel_frequency(&gs_handle, freq);
+    if (res != 0)
+    {
+        nrf24l01_interface_debug_print("nrf24l01: get channel frequency failed.\n");
+        return 1;
+    }
+    
+    return 0;
+}
+
+/**
+ * @brief     basic example set tx address
+ * @param[in] *addr pointer to a address buffer (5 bytes)
+ * @return    status code
+ *            - 0 success
+ *            - 1 set tx address failed
+ * @note      Set the TX address once, then use nrf24l01_basic_sent() for continuous sending
+ *            without resetting the address each time
+ */
+uint8_t nrf24l01_basic_set_tx_address(uint8_t *addr)
+{
+    uint8_t res;
+    
+    if (addr == NULL)
+    {
+        return 1;
+    }
+    
+    /* set tx address */
+    res = nrf24l01_set_tx_address(&gs_handle, (uint8_t *)addr, NRF24L01_BASIC_DEFAULT_ADDRESS_WIDTH + 2);
+    if (res != 0)
+    {
+        nrf24l01_interface_debug_print("nrf24l01: set tx address failed. with %d\n", res);
+        return 1;
+    }
+    
+    /* set rx pipe 0 address (for auto-ack) */
+    res = nrf24l01_set_rx_pipe_0_address(&gs_handle, (uint8_t *)addr, NRF24L01_BASIC_DEFAULT_ADDRESS_WIDTH + 2);
+    if (res != 0)
+    {
+        nrf24l01_interface_debug_print("nrf24l01: set rx pipe 0 address failed. with %d\n", res);
+        return 1;
+    }
+    
+    /* save the address */
+    memcpy(gs_tx_addr, addr, 5);
+    gs_tx_addr_set = 1;
+    
+    return 0;
+}
+
+/**
+ * @brief     basic example sent (continuous mode)
+ * @param[in] *buf pointer to a data buffer
+ * @param[in] len buffer length
+ * @param[in] use_ack enable or disable acknowledgment
+ * @return    status code
+ *            - 0 success
+ *            - 1 send failed
+ * @note      Use nrf24l01_basic_set_tx_address() first to set the address,
+ *            then use this function for continuous sending
+ */
+uint8_t nrf24l01_basic_sent(uint8_t *buf, uint8_t len, nrf24l01_bool_t use_ack)
+{
+    uint8_t res;
+    
+    /* check if address has been set */
+    if (gs_tx_addr_set == 0)
+    {
+        nrf24l01_interface_debug_print("nrf24l01: tx address not set. call nrf24l01_basic_set_tx_address() first.\n");
+        return 1;
+    }
+    
+    /* send data directly without setting address */
     res = nrf24l01_send(&gs_handle, (uint8_t *)buf, len, use_ack);
-     if (res != 0)
-     {
-         return 1;
-     }
-     
-     return 0;
- }
+    if (res != 0)
+    {
+        return 1;
+    }
+    
+    return 0;
+}
+
+/**
+ * @brief      basic example get tx address
+ * @param[out] *addr pointer to a address buffer (must be 5 bytes)
+ * @param[out] *is_set pointer to flag indicating if address has been set
+ * @return     status code
+ *             - 0 success
+ *             - 1 get tx address failed
+ * @note       Returns the currently configured TX address
+ */
+uint8_t nrf24l01_basic_get_tx_address(uint8_t *addr, uint8_t *is_set)
+{
+    if (addr == NULL || is_set == NULL)
+    {
+        return 1;
+    }
+    
+    /* copy the address */
+    memcpy(addr, gs_tx_addr, 5);
+    *is_set = gs_tx_addr_set;
+    
+    return 0;
+}

@@ -145,10 +145,66 @@
  * @note      none
  */
 uint8_t nrf24l01_basic_send(uint8_t *addr, uint8_t *buf, uint8_t len, nrf24l01_bool_t use_ack);
- 
- /**
-  * @}
-  */
+
+/**
+ * @brief     basic example set frequency
+ * @param[in] freq channel frequency (0-127)
+ * @return    status code
+ *            - 0 success
+ *            - 1 set frequency failed
+ * @note      actual frequency = 2400 MHz + freq MHz
+ *            freq must be <= 0x7F (127)
+ */
+uint8_t nrf24l01_basic_set_frequency(uint8_t freq);
+
+/**
+ * @brief      basic example get frequency
+ * @param[out] *freq pointer to a channel frequency buffer
+ * @return     status code
+ *             - 0 success
+ *             - 1 get frequency failed
+ * @note       actual frequency = 2400 MHz + freq MHz
+ */
+uint8_t nrf24l01_basic_get_frequency(uint8_t *freq);
+
+/**
+ * @brief     basic example set tx address
+ * @param[in] *addr pointer to a address buffer (5 bytes)
+ * @return    status code
+ *            - 0 success
+ *            - 1 set tx address failed
+ * @note      Set the TX address once, then use nrf24l01_basic_sent() for continuous sending
+ *            without resetting the address each time
+ */
+uint8_t nrf24l01_basic_set_tx_address(uint8_t *addr);
+
+/**
+ * @brief     basic example sent (continuous mode)
+ * @param[in] *buf pointer to a data buffer
+ * @param[in] len buffer length
+ * @param[in] use_ack enable or disable acknowledgment
+ * @return    status code
+ *            - 0 success
+ *            - 1 send failed
+ * @note      Use nrf24l01_basic_set_tx_address() first to set the address,
+ *            then use this function for continuous sending
+ */
+uint8_t nrf24l01_basic_sent(uint8_t *buf, uint8_t len, nrf24l01_bool_t use_ack);
+
+/**
+ * @brief      basic example get tx address
+ * @param[out] *addr pointer to a address buffer (must be 5 bytes)
+ * @param[out] *is_set pointer to flag indicating if address has been set
+ * @return     status code
+ *             - 0 success
+ *             - 1 get tx address failed
+ * @note       Returns the currently configured TX address
+ */
+uint8_t nrf24l01_basic_get_tx_address(uint8_t *addr, uint8_t *is_set);
+
+/**
+ * @}
+ */
  
  #ifdef __cplusplus
  }
