@@ -75,26 +75,6 @@
 #define EVT_DS5_READY               EVENT_MASK(0)
 #define EVT_NRF24_INTERRUPT         EVENT_MASK(1)
 
-/* PS5 Controller Button Constants */
-#define PS5_BTN_UP                  0x00
-#define PS5_BTN_RIGHT               0x01
-#define PS5_BTN_DOWN                0x02
-#define PS5_BTN_LEFT                0x03
-#define PS5_BTN_SQUARE              0x04
-#define PS5_BTN_CROSS               0x05
-#define PS5_BTN_CIRCLE              0x06
-#define PS5_BTN_TRIANGLE            0x07
-#define PS5_BTN_L1                  0x08
-#define PS5_BTN_R1                  0x09
-#define PS5_BTN_L2                  0x0A
-#define PS5_BTN_R2                  0x0B
-#define PS5_BTN_CREATE              0x0C
-#define PS5_BTN_OPTIONS             0x0D
-#define PS5_BTN_L3                  0x0E
-#define PS5_BTN_R3                  0x0F
-#define PS5_BTN_PS                  0x10
-#define PS5_BTN_TOUCHPAD            0x11
-#define PS5_BTN_MICROPHONE          0x12
 
 /* ===========================================================================
  * TYPE DEFINITIONS AND STRUCTURES
